@@ -643,14 +643,19 @@ if(formUser) {
 }
 
 function logout() {
-    // Only try to log if we have a token
-    const promise = sessionToken ? logAction('ÇIKIŞ', 'Kullanıcı oturumu kapattı') : Promise.resolve();
-    promise.finally(() => {
-        localStorage.removeItem('user');
-        localStorage.removeItem('sessionToken');
-        localStorage.clear(); sessionStorage.clear(); // Clear any temp data
+    // Immediate clear to be safe
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // Attempt to log the action but don't block on it
+    if (sessionToken) {
+        logAction('ÇIKIŞ', 'Kullanıcı oturumu kapattı');
+    }
+    
+    // Small timeout to allow the log fetch to start (not wait)
+    setTimeout(() => {
         location.reload();
-    });
+    }, 200);
 }
 
 async function loadData() {
@@ -1581,9 +1586,3 @@ function exportToExcel() {
 
 attachUiEvents();
 init();
-
-
-function logout() {
-    localStorage.clear(); sessionStorage.clear();
-    location.reload();
-}
