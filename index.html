@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Sigorta Durağı Kontrol Paneli</title>
+
+    <!-- PWA Meta Tags -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="mobile-web-app-capable" content="yes">
+
+    <!-- Apple (iOS) PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="SD Kontrol">
+    <link rel="apple-touch-icon" href="icon.jpeg">
+    <link rel="apple-touch-startup-image" href="icon.jpeg">
+
+    <!-- SEO -->
+    <meta name="description" content="Sigorta Durağı - Kurumsal CRM Poliçe Yönetim Platformu">
+
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body data-theme="light">
+
+    <!-- Login -->
+    <div id="login-screen">
+        <div class="login-card">
+            <img src="icon.jpeg" alt="Logo" onerror="this.src='https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/shield.svg'">
+            <div style="margin: 1.5rem 0 2rem 0;">
+                <h1 style="font-size: 1.8rem; font-weight: 800; color: var(--text-main); line-height: 1.1; letter-spacing: -1px; margin-bottom: 5px;">Sigorta Durağı</h1>
+                <p style="font-size: 1rem; font-weight: 600; color: var(--primary); text-transform: uppercase; letter-spacing: 2px;">Kontrol Paneli</p>
+            </div>
+            <form id="login-form">
+                <div class="form-group"><input type="text" id="username" placeholder="Kullanıcı Adı" required></div>
+                <div class="form-group"><input type="password" id="password" placeholder="Şifre" required></div>
+                <div id="login-error" style="display:none; color:var(--danger); background:rgba(255,107,107,0.1); padding:0.8rem; border-radius:8px; font-size:0.8rem; margin-bottom:1rem; border:1px solid rgba(255,107,107,0.2);"></div>
+                <button type="submit" id="login-btn" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 1rem; border-radius: 12px;">Sisteme Giriş Yap</button>
+            </form>
+
+            <form id="twofa-form" style="display:none;">
+                <div style="background: rgba(99, 102, 241, 0.05); padding: 1rem; border-radius: 12px; margin-bottom: 1.5rem;">
+                    <i data-lucide="shield-check" style="width: 24px; color: var(--primary); margin-bottom: 8px;"></i>
+                    <p style="font-size: 0.85rem; color: var(--text-main); font-weight: 600;">2FA Doğrulama</p>
+                    <p style="font-size: 0.75rem; color: var(--text-muted);">Google Authenticator uygulamasındaki 6 haneli kodu girin.</p>
+                </div>
+                <div class="form-group">
+                    <input type="text" id="2fa-code" placeholder="000000" maxlength="6" style="text-align: center; font-size: 1.5rem; letter-spacing: 5px; font-weight: 800;" required>
+                </div>
+                <div id="2fa-error" style="display:none; color:var(--danger); background:rgba(255,107,107,0.1); padding:0.8rem; border-radius:8px; font-size:0.8rem; margin-bottom:1rem; border:1px solid rgba(255,107,107,0.2);"></div>
+                <button type="submit" id="2fa-btn" class="btn btn-primary" style="width: 100%; justify-content: center; padding: 1rem; border-radius: 12px;">Doğrula ve Giriş Yap</button>
+                <button type="button" class="btn btn-outline" onclick="location.reload()" style="width: 100%; justify-content: center; margin-top: 10px; border:none; color:var(--text-muted);">Geri Dön</button>
+            </form>
+            <div id="login-ip" style="margin-top: 1rem; font-size: 0.75rem; color: var(--text-muted);"></div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="logo-container">
+            <img src="icon.jpeg" alt="Logo" onerror="this.src='https://raw.githubusercontent.com/lucide-icons/lucide/main/icons/shield.svg'">
+            <h1>Kontrol Paneli</h1>
+        </div>
+        
+        <nav class="nav-menu">
+            <a href="#" class="nav-item active" data-page="dashboard"><i data-lucide="layout-dashboard"></i> <span>Genel Bakış</span></a>
+            <a href="#" class="nav-item" data-page="policies"><i data-lucide="shield-check"></i> <span>Poliçeler</span></a>
+            <a href="#" class="nav-item" data-page="renewals"><i data-lucide="refresh-cw"></i> <span>Yenilemeler</span></a>
+            <a href="#" class="nav-item" data-page="customers"><i data-lucide="users"></i> <span>Müşteriler</span></a>
+            <a href="#" class="nav-item" data-page="proposals"><i data-lucide="file-signature"></i> <span>Teklifler</span></a>
+            <a href="#" class="nav-item" data-page="documents"><i data-lucide="folder-open"></i> <span>Evraklar</span></a>
+            <a href="#" class="nav-item" data-page="finance"><i data-lucide="wallet"></i> <span>Bilanço</span></a>
+            <a href="#" class="nav-item" data-page="reports"><i data-lucide="bar-chart-2"></i> <span>Raporlar</span></a>
+            <a href="#" class="nav-item" data-page="commissions"><i data-lucide="pie-chart"></i> <span>Komisyon</span></a>
+            <div style="flex:1;"></div>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-wrapper">
+        <header>
+            <!-- Mobile hamburger -->
+            <button class="mobile-menu-btn icon-btn" id="mobile-menu-btn" onclick="document.querySelector('.sidebar').classList.toggle('active')" style="display:none;">
+                <i data-lucide="menu"></i>
+            </button>
+            <div class="search-bar">
+                <i data-lucide="search"></i>
+                <input type="text" id="global-search" placeholder="Müşteri, poliçe, plaka ara (Hızlı Arama)...">
+            </div>
+            <div class="header-right">
+                <button class="icon-btn" id="theme-toggle" title="Karanlık Mod"><i data-lucide="moon"></i></button>
+                <button class="icon-btn" title="Bildirimler"><i data-lucide="bell"></i></button>
+                <div class="user-profile" onclick="document.getElementById('user-menu').classList.toggle('active')">
+                    <div class="user-avatar" id="header-avatar">U</div>
+                    <div class="user-info">
+                        <span class="user-name" id="header-username">Kullanıcı</span>
+                        <span class="user-role" id="header-role">Rol</span>
+                    </div>
+                    <i data-lucide="chevron-down" style="width:16px;"></i>
+                </div>
+                <!-- User Context Menu -->
+                <div class="user-menu" id="user-menu">
+                    <a href="#" onclick="showPage('settings-mgmt')" class="admin-only"><i data-lucide="settings-2"></i> Şirket/Branş Yönetimi</a>
+                    <a href="#" onclick="showPage('settings')"><i data-lucide="users"></i> Kullanıcı Yönetimi</a>
+                    <a href="#" onclick="showPage('logs')"><i data-lucide="file-text"></i> Sistem Logları</a>
+                    <div style="border-top:1px solid var(--border-color); margin: 5px 0;"></div>
+                    <a href="#" onclick="logout()" style="color:var(--danger);"><i data-lucide="log-out"></i> Çıkış Yap</a>
+                </div>
+            </div>
+        </header>
+
+        <div id="page-content">
+            <!-- DASHBOARD -->
+            <div id="dashboard" class="page-section active">
+                <div class="panel-header" style="margin-bottom: 2rem;">
+                    <h2>Gösterge Paneli</h2>
+                    <button class="btn btn-primary" onclick="openDrawer('policy-drawer')">
+                        <i data-lucide="plus"></i> Yeni Poliçe
+                    </button>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-details">
+                            <span class="stat-label">Aktif Poliçe</span>
+                            <span class="stat-value" id="kpi-active">0</span>
+                        </div>
+                        <div style="flex:1;"></div>
+                        <div class="stat-icon success"><i data-lucide="shield"></i></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-details">
+                            <span class="stat-label">Yaklaşan (30G)</span>
+                            <span class="stat-value" id="kpi-expiring">0</span>
+                        </div>
+                        <div style="flex:1;"></div>
+                        <div class="stat-icon warning"><i data-lucide="clock"></i></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-details">
+                            <span class="stat-label">Vadesi Geçen</span>
+                            <span class="stat-value" id="kpi-expired">0</span>
+                        </div>
+                        <div style="flex:1;"></div>
+                        <div class="stat-icon danger"><i data-lucide="alert-circle"></i></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-details">
+                            <span class="stat-label">Aylık Üretim</span>
+                            <span class="stat-value" id="kpi-month-net">₺0</span>
+                        </div>
+                        <div style="flex:1;"></div>
+                        <div class="stat-icon primary"><i data-lucide="trending-up"></i></div>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="glass-panel">
+                        <div class="panel-header"><h2>Aylık Üretim Trendi</h2></div>
+                        <div class="chart-container"><canvas id="monthlyChart"></canvas></div>
+                    </div>
+                    <div class="glass-panel">
+                        <div class="panel-header"><h2>Branş Dağılımı</h2></div>
+                        <div class="chart-container"><canvas id="branchChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- POLICIES -->
+            <div id="policies" class="page-section">
+                <div class="glass-panel">
+                    <div class="panel-header">
+                        <h2>Poliçe Yönetimi</h2>
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn btn-outline" onclick="exportToExcel()"><i data-lucide="file-spreadsheet"></i> Excel</button>
+                            <button class="btn btn-primary" onclick="openDrawer('policy-drawer')"><i data-lucide="plus"></i> Yeni</button>
+                        </div>
+                    </div>
+                    <div class="filter-bar">
+                        <input type="text" id="filter-policy-search" placeholder="İsim / Plaka filtrele...">
+                        <select id="filter-company"><option value="">Tüm Şirketler</option></select>
+                        <select id="filter-branch"><option value="">Tüm Branşlar</option></select>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Durum</th>
+                                <th>Başlangıç</th>
+                                <th>Bitiş</th>
+                                <th>Poliçe No</th>
+                                <th>Sigortalı</th>
+                                <th>Şirket</th>
+                                <th>Branş</th>
+                                <th>Brüt Prim</th>
+                                <th>Net Prim</th>
+                                <th>İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-policies"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- RENEWALS -->
+            <div id="renewals" class="page-section">
+                <div class="glass-panel">
+                    <div class="panel-header"><h2>Yenileme Takip Modülü</h2></div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Durum</th>
+                                <th>Müşteri</th>
+                                <th>Poliçe / Plaka</th>
+                                <th>Bitiş Tarihi</th>
+                                <th>Kalan Gün</th>
+                                <th>Aksiyon</th>
+                                <th>İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-renewals"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- CUSTOMERS -->
+            <div id="customers" class="page-section">
+                <div class="glass-panel">
+                    <div class="panel-header"><h2>Müşteri Veritabanı (CRM)</h2></div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Ad Soyad</th>
+                                <th>TC / VKN</th>
+                                <th>Telefon</th>
+                                <th>Poliçe Sayısı</th>
+                                <th>Toplam Üretim</th>
+                                <th>İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-customers"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- PROPOSALS -->
+            <div id="proposals" class="page-section">
+                <div class="glass-panel">
+                    <div class="panel-header">
+                        <h2>Teklifler</h2>
+                        <button class="btn btn-primary" onclick="openDrawer('proposal-drawer')"><i data-lucide="plus"></i> Yeni Teklif</button>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Durum</th>
+                                <th>Tarih</th>
+                                <th>Müşteri</th>
+                                <th>Araç / Risk</th>
+                                <th>Şirket</th>
+                                <th>Teklif Primi</th>
+                                <th>İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-proposals"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- DOCUMENTS (Evraklar) -->
+            <div id="documents" class="page-section">
+                <div class="glass-panel">
+                    <div class="panel-header">
+                        <h2>Sisteme Yüklü Evraklar</h2>
+                        <div class="search-box">
+                            <i data-lucide="search"></i>
+                            <input type="text" placeholder="Evrak ara (Müşteri, Poliçe No)..." id="search-docs" onkeyup="renderDocumentsTable()">
+                        </div>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Tarih</th>
+                                <th>Müşteri</th>
+                                <th>Poliçe No</th>
+                                <th>Şirket/Branş</th>
+                                <th>Dosya</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-documents"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- FINANCE (Bilanço) -->
+            <div id="finance" class="page-section">
+                <div class="glass-panel">
+                    <div class="panel-header">
+                        <h2>Dükkan Gelir / Gider (Bilanço)</h2>
+                        <button class="btn btn-primary" onclick="openDrawer('finance-drawer')"><i data-lucide="plus"></i> Yeni İşlem</button>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Tarih</th>
+                                <th>Tür</th>
+                                <th>Kategori</th>
+                                <th>Açıklama</th>
+                                <th>Tutar</th>
+                                <th>İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-finance"></tbody>
+                    </table>
+                </div>
+            </div>
+
+             <!-- REPORTS & COMMISSIONS-->
+             <div id="reports" class="page-section">
+                <div class="glass-panel">
+                    <div class="panel-header"><h2>Şirket Bazlı Analiz (Genel Toplam)</h2></div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Şirket</th>
+                                <th>Poliçe Adedi</th>
+                                <th>Zeyil Adedi</th>
+                                <th>Net Prim</th>
+                                <th>Komisyon / Kazanç</th>
+                                <th>Ürt. Oran</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-reports"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="commissions" class="page-section">
+                <div class="glass-panel">
+                    <div class="panel-header"><h2>Branş Bazlı Komisyon Özeti</h2></div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Branş</th>
+                                <th>Poliçe Adedi</th>
+                                <th>Toplam Net Prim</th>
+                                <th>Toplam Komisyon</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-commission-summary"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SETTINGS MGMT (Yönetim) -->
+            <div id="settings-mgmt" class="page-section">
+                <div class="charts-grid" style="grid-template-columns: 1fr 1fr;">
+                    <div class="glass-panel">
+                        <div class="panel-header"><h2>Şirketler</h2></div>
+                        <div style="display:flex; gap:10px; margin-bottom:1rem;">
+                            <input type="text" id="new-company-name" placeholder="Yeni Şirket..." style="flex:1;">
+                            <button class="btn btn-primary" onclick="addSetting('company')">Ekle</button>
+                        </div>
+                        <table style="font-size: 0.85rem;">
+                            <thead><tr><th>Şirket Adı</th><th style="text-align:right;">İşlem</th></tr></thead>
+                            <tbody id="list-companies"></tbody>
+                        </table>
+                    </div>
+                    <div class="glass-panel">
+                        <div class="panel-header"><h2>Branşlar</h2></div>
+                        <div style="display:flex; gap:10px; margin-bottom:1rem;">
+                            <input type="text" id="new-branch-name" placeholder="Yeni Branş..." style="flex:1;">
+                            <button class="btn btn-primary" onclick="addSetting('branch')">Ekle</button>
+                        </div>
+                        <table style="font-size: 0.85rem;">
+                            <thead><tr><th>Branş Adı</th><th style="text-align:right;">İşlem</th></tr></thead>
+                            <tbody id="list-branches"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SETTINGS / USERS -->
+            <div id="settings" class="page-section">
+                <div class="glass-panel">
+                    <div class="panel-header"><h2>Kullanıcı Yönetimi</h2></div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Ad Soyad</th>
+                                <th>Kullanıcı Adı</th>
+                                <th>Rol</th>
+                                <th>İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-users"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- LOGS -->
+            <div id="logs" class="page-section">
+                <div class="glass-panel">
+                    <div class="panel-header"><h2>Sistem İşlem Logları</h2></div>
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Tarih</th>
+                                    <th>Kullanıcı</th>
+                                    <th>İşlem</th>
+                                    <th>Detay</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-logs"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Drawers -->
+    <div class="overlay" id="overlay" onclick="closeAllDrawers()"></div>
+
+    <!-- Policy Drawer -->
+    <div class="drawer" id="policy-drawer">
+        <div class="drawer-header"><h2 id="policy-drawer-title" style="margin-bottom: 0;">Yeni Poliçe</h2><button type="button" class="icon-btn" onclick="closeAllDrawers()" title="Kapat"><i data-lucide="x"></i></button></div>
+        <form id="form-policy">
+            <div style="display:flex; gap:1rem;">
+                <div class="form-group" style="flex:1;">
+                    <label>Şirket</label>
+                    <select id="p_company" required></select>
+                </div>
+                <div class="form-group" style="flex:1;">
+                    <label>Branş</label>
+                    <select id="p_branch" required></select>
+                </div>
+            </div>
+            <div style="display:flex; gap:1rem;">
+                <div class="form-group" style="flex:2;"><label>Poliçe No</label><input type="text" id="p_no" required autocomplete="off"></div>
+                <div class="form-group" style="flex:1;"><label>Ek No</label><input type="text" id="p_ek" value="0"></div>
+            </div>
+            <div class="form-group"><label>Müşteri Ad Soyad / Ünvan</label><input type="text" id="p_customer" required></div>
+            <div style="display:flex; gap:1rem;">
+                <div class="form-group" style="flex:1;"><label>TC / VKN</label><input type="text" id="p_tc" maxlength="11" inputmode="numeric"></div>
+                <div class="form-group" style="flex:1;"><label>Telefon</label><input type="text" id="p_phone" maxlength="11" inputmode="numeric"></div>
+            </div>
+            <div style="display:flex; gap:1rem;">
+                <div class="form-group" style="flex:1;"><label>Tanzim Tarihi</label><input type="date" id="p_issue" required></div>
+                <div class="form-group" style="flex:1;"><label>Poliçe Başlangıç</label><input type="date" id="p_start" required></div>
+            </div>
+            <div class="form-group"><label>Poliçe Bitiş (Vade)</label><input type="date" id="p_expiry" required></div>
+            
+            <div style="display:flex; gap:1rem;">
+                <div class="form-group" style="flex:1;"><label>Brüt Prim (₺)</label><input type="text" id="p_gross" placeholder="0,00" required></div>
+                <div class="form-group" style="flex:1;"><label>Net Prim (₺)</label><input type="text" id="p_net" placeholder="0,00" required></div>
+            </div>
+            <div class="form-group"><label>Komisyon (₺)</label><input type="text" id="p_comm" placeholder="0,00"></div>
+            
+            <div class="form-group"><label>Plaka / Kısa Açıklama</label><input type="text" id="p_desc"></div>
+            
+            <div class="form-group" style="margin-top:1rem; padding:1.25rem; background:rgba(99, 102, 241, 0.03); border-radius:18px; border:2px dashed var(--border-color);">
+                <label style="display:flex; align-items:center; gap:8px; margin-bottom:12px; font-size: 0.85rem;">
+                    <i data-lucide="files" style="width:18px; color:var(--primary);"></i> Evrakları Seç (Poliçe, Kimlik, Ehliyet vb.)
+                </label>
+                <input type="file" id="p_file_input" accept=".pdf, .jpg, .jpeg, .png" multiple style="margin-bottom: 10px;">
+                <div id="file-list-container" style="display: flex; flex-direction: column; gap: 8px;">
+                    <!-- Uploaded files will appear here as chips/lines -->
+                </div>
+                <input type="hidden" id="p_doc_url">
+            </div>
+
+            <div class="form-group"><label>Notlar / Hatırlatmalar</label><textarea id="p_note" rows="3" style="resize:vertical;"></textarea></div>
+            <div class="drawer-actions"><button type="button" class="btn btn-outline" onclick="closeAllDrawers()" style="justify-content:center; padding:1rem;">İptal</button><button type="submit" id="policy-submit-btn" class="btn btn-primary" style="justify-content:center; padding:1rem;"><i data-lucide="save"></i> Kaydet</button></div>
+        </form>
+    </div>
+
+    <!-- Finance Drawer -->
+    <div class="drawer" id="finance-drawer">
+        <h2 style="margin-bottom: 2rem;">Finansal İşlem</h2>
+        <form id="form-finance">
+            <div class="form-group">
+                <label>Tarih</label>
+                <input type="date" id="fin_date" required>
+            </div>
+            <div class="form-group">
+                <label>İşlem Türü</label>
+                <select id="fin_type">
+                    <option value="Gelir">Dükkan Gelir (Nakit vb.)</option>
+                    <option value="Gider">Dükkan Gider (Kira, Fatura vb.)</option>
+                </select>
+            </div>
+            <div class="form-group"><label>Kategori</label><input type="text" id="fin_cat" placeholder="Örn: Kira, Maaş, Ofis..." required></div>
+            <div class="form-group"><label>Açıklama</label><input type="text" id="fin_desc"></div>
+            <div class="form-group"><label>Tutar (₺)</label><input type="text" id="fin_amt" required></div>
+            <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:1rem;"><i data-lucide="save"></i> Kaydet</button>
+        </form>
+    </div>
+
+    <!-- Proposal Drawer -->
+    <div class="drawer" id="proposal-drawer">
+        <h2 style="margin-bottom: 2rem;">Yeni Teklif</h2>
+        <form id="form-proposal">
+            <div class="form-group"><label>Müşteri Adı</label><input type="text" id="pr_cust" required></div>
+            <div class="form-group"><label>Araç / Risk</label><input type="text" id="pr_risk" required></div>
+            <div class="form-group"><label>Şirket</label><input type="text" id="pr_comp" required></div>
+            <div class="form-group"><label>Net Teklif Tutar (₺)</label><input type="text" id="pr_amt" required></div>
+            <div class="form-group"><label>Durum</label>
+                <select id="pr_status">
+                    <option value="Bekliyor">Bekliyor</option>
+                    <option value="Kabul">Kabul Edildi</option>
+                    <option value="Red">Reddedildi</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:1rem;"><i data-lucide="save"></i> Kaydet</button>
+        </form>
+    </div>
+
+    <!-- Customer Detail Drawer -->
+    <div class="drawer" id="customer-drawer">
+        <h2 style="margin-bottom: 2rem;">Müşteri Detay Kartı</h2>
+        <div id="customer-profile-content">
+            <!-- Dynamic content -->
+        </div>
+        <h3 style="margin: 1.5rem 0 1rem 0; font-size: 1rem;">Müşteriye Ait Poliçeler</h3>
+        <div class="glass-panel" style="padding:0; overflow:hidden;">
+            <table style="font-size: 0.75rem;">
+                <thead>
+                    <tr>
+                        <th>Poliçe No</th>
+                        <th>Şirket</th>
+                        <th>Branş</th>
+                        <th>Vade</th>
+                    </tr>
+                </thead>
+                <tbody id="customer-policies-list"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- User Edit Drawer -->
+    <div class="drawer" id="user-drawer">
+        <h2 style="margin-bottom: 2rem;">Kullanıcı Düzenle</h2>
+        <form id="form-user">
+            <div class="form-group"><label>Ad Soyad</label><input type="text" id="u_fullname" required></div>
+            <div class="form-group"><label>Kullanıcı Adı</label><input type="text" id="u_username" readonly style="background:var(--bg-card); opacity:0.7;"></div>
+            <div class="form-group"><label>Rol</label>
+                <select id="u_role">
+                    <option value="admin">ADMIN</option>
+                    <option value="user">USER</option>
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:1rem; margin-bottom: 0.5rem;"><i data-lucide="save"></i> Güncelle</button>
+            <button type="button" class="btn btn-outline" id="setup-2fa-btn-drawer" onclick="setupTwoFactor()" style="width:100%; justify-content:center; padding:0.8rem; margin-bottom: 0.5rem;"><i data-lucide="shield-check"></i> 2FA Kurulumu</button>
+            <button type="button" class="btn btn-outline" onclick="resetUserPassword()" style="width:100%; justify-content:center; padding:0.8rem; color:var(--danger); border-color:var(--danger);"><i data-lucide="refresh-ccw"></i> Şifreyi Sıfırla (123456)</button>
+        </form>
+    </div>
+
+    <!-- Forced Password Change -->
+    <div id="password-change-screen" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:20000; align-items:center; justify-content:center;">
+        <div class="login-card" style="background:var(--bg-card);">
+            <i data-lucide="shield-alert" style="width:48px; height:48px; color:var(--warning); margin-bottom:1rem;"></i>
+            <h2 style="margin-bottom:1rem;">Şifrenizi Değiştirin</h2>
+            <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.5rem;">Güvenliğiniz için lütfen yeni bir şifre belirleyin.</p>
+            <form id="form-password-change">
+                <div class="form-group"><input type="password" id="new_pass" placeholder="Yeni Şifre" required></div>
+                <div class="form-group"><input type="password" id="confirm_pass" placeholder="Şifre Tekrar" required></div>
+                <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:1rem;">Şifreyi Güncelle ve Başla</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Document Preview Modal -->
+    <div class="drawer doc-preview-drawer" id="preview-drawer" style="width: 80%; max-width: 1000px;">
+        <div class="drawer-header">
+            <h2 id="preview-title" style="margin-bottom: 0;">Evrak Önizleme</h2>
+            <div style="display:flex; gap:10px;">
+                <a id="preview-download-btn" href="#" target="_blank" class="btn btn-outline" title="İndir"><i data-lucide="download"></i></a>
+                <button type="button" class="icon-btn" onclick="closeAllDrawers()" title="Kapat"><i data-lucide="x"></i></button>
+            </div>
+        </div>
+        <div id="preview-content" style="height: calc(100% - 80px); display: flex; align-items: center; justify-content: center; background: #000; border-radius: 12px; overflow: hidden;">
+            <!-- Content will be injected via JS -->
+        </div>
+    </div>
+
+    <!-- 2FA Setup Drawer -->
+    <div id="twofa-setup-drawer" class="drawer">
+        <div class="drawer-header">
+            <h2 style="display:flex; align-items:center; gap:10px;"><i data-lucide="shield-check" style="color:var(--primary);"></i> 2FA Kurulumu</h2>
+            <button class="icon-btn" onclick="closeAllDrawers()"><i data-lucide="x"></i></button>
+        </div>
+        <div style="text-align:center;">
+            <p style="color:var(--text-muted); margin-bottom:1.5rem; font-size:0.85rem;">Google Authenticator uygulamasını açıp aşağıdaki QR kodu taratın.</p>
+            <div id="2fa-qr-container" style="background:#fff; padding:1rem; border-radius:20px; display:inline-block; margin-bottom:1.5rem; box-shadow:var(--glass-shadow); border:2px solid var(--border-color);">
+                <!-- QR Image injected here -->
+            </div>
+            <div style="background:rgba(99, 102, 241, 0.05); padding:1rem; border-radius:18px; text-align:left; margin-bottom: 2rem;">
+                <p style="font-weight:700; font-size:0.75rem; margin-bottom:5px; color:var(--text-main);">Manuel Giriş Kodu:</p>
+                <code id="2fa-secret-text" style="display:block; background:#fff; padding:8px; border-radius:8px; font-size:1rem; text-align:center; border:1px solid var(--border-color); letter-spacing:2px; font-weight:800;">XXXX XXXX XXXX XXXX</code>
+            </div>
+            <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:1.5rem;">Bu kodu tarattıktan sonra artık sisteme her girişinizde telefonunuzdaki kodu girmeniz gerekecektir.</p>
+            <button class="btn btn-primary" onclick="closeAllDrawers()" style="width:100%; justify-content:center; padding:1.25rem;">Kurulumu Tamamladım</button>
+        </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Mobile Bottom Navigation -->
+    <nav class="mobile-bottom-nav" id="mobile-bottom-nav">
+        <a href="#" class="mob-nav-item active" data-page="dashboard">
+            <i data-lucide="layout-dashboard"></i>
+            <span>Panel</span>
+        </a>
+        <a href="#" class="mob-nav-item" data-page="policies">
+            <i data-lucide="shield-check"></i>
+            <span>Poliçeler</span>
+        </a>
+        <a href="#" class="mob-nav-item mob-nav-fab" onclick="openDrawer('policy-drawer')">
+            <i data-lucide="plus"></i>
+        </a>
+        <a href="#" class="mob-nav-item" data-page="customers">
+            <i data-lucide="users"></i>
+            <span>Müşteriler</span>
+        </a>
+    </nav>
+
+    <!-- Mobile Sidebar Overlay -->
+    <div id="mobile-sidebar-overlay" onclick="document.querySelector('.sidebar').classList.remove('active'); this.style.display='none';" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:2000; backdrop-filter:blur(4px);"></div>
+
+    <script src="app.js"></script>
+    <script>
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW registered:', reg.scope))
+                    .catch(err => console.warn('SW registration failed:', err));
+            });
+        }
+
+        // Mobile sidebar close on outside click
+        document.querySelector('.sidebar') && document.querySelector('.sidebar').addEventListener('transitionend', function() {
+            const overlay = document.getElementById('mobile-sidebar-overlay');
+            if (this.classList.contains('active')) {
+                overlay.style.display = 'block';
+            } else {
+                overlay.style.display = 'none';
+            }
+        });
+        // Mobile bottom nav clicks
+        document.querySelectorAll('.mob-nav-item[data-page]').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                const page = item.dataset.page;
+                if (page && typeof showPage === 'function') {
+                    showPage(page);
+                    document.querySelectorAll('.mob-nav-item').forEach(n => n.classList.remove('active'));
+                    item.classList.add('active');
+                }
+            });
+        });
+
+    </script>
+</body>
+</html>
