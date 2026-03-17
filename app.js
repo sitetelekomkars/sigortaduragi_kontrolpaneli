@@ -472,14 +472,27 @@ async function logAction(act, detail="") {
 function renderLogsTable() {
     const container = document.getElementById('table-logs');
     if(!container) return;
-    container.innerHTML = logs.map(l => `
-        <tr>
-            <td><small>${new Date(l.dt||l.timestamp).toLocaleString('tr-TR')}</small></td>
-            <td><strong>${l.user||l.username}</strong></td>
-            <td><span class="badge badge-neutral" style="font-size:0.65rem;">${(l.act||l.action || 'İŞLEM').toUpperCase()}</span></td>
-            <td><small style="color:var(--text-muted);">${l.detail||l.details||'-'}</small></td>
-        </tr>
-    `).join('');
+    container.innerHTML = logs.map(l => {
+        let dateStr = l.dt || l.timestamp;
+        let displayDate = dateStr;
+        
+        // If it's a standard date/ISO, format it. If it's already a TR string, use as is.
+        if (dateStr && !dateStr.toString().includes(':') || (dateStr && !/\d{2}\.\d{2}\.\d{4}/.test(dateStr))) {
+            try {
+                const d = new Date(dateStr);
+                if (!isNaN(d.getTime())) displayDate = d.toLocaleString('tr-TR');
+            } catch(e) {}
+        }
+
+        return `
+            <tr>
+                <td><small>${displayDate}</small></td>
+                <td><strong>${l.user||l.username}</strong></td>
+                <td><span class="badge badge-neutral" style="font-size:0.65rem;">${(l.act||l.action || 'İŞLEM').toUpperCase()}</span></td>
+                <td><small style="color:var(--text-muted);">${l.detail||l.details||'-'}</small></td>
+            </tr>
+        `;
+    }).join('');
 }
 
 function renderUsersTable() {
