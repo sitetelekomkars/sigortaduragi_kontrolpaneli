@@ -1,1 +1,0 @@
-# sigortaduragi_kontrolpaneli
