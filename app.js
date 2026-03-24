@@ -1,7 +1,7 @@
 let policies = [], users = [], logs = [];
 let proposals = JSON.parse(localStorage.getItem('proposals')) || [];
 let finance = [];
-let settings = { companies: [], branches: [] };
+let settings = { companies: [], branches: [], renewalActions: [] };
 let currentUser = JSON.parse(localStorage.getItem('user')) || null;
 let sessionToken = localStorage.getItem('sessionToken') || null;
 let currentIP = '---';
@@ -79,6 +79,46 @@ function fmtCy(v) { return new Intl.NumberFormat('tr-TR', {style:'currency', cur
 function showToast(msg, type='info') { const c=document.getElementById('toast-container'); if(!c) return; const t=document.createElement('div'); t.className=`toast ${type}`; t.innerHTML=`<i data-lucide="${type==='error'?'alert-octagon':'check-circle'}"></i><span>${escapeHtml(msg)}</span>`; c.appendChild(t); lucide.createIcons(); setTimeout(()=>t.remove(),4000); }
 
 function normalizeText(v) { return (v ?? '').toString().trim(); }
+function toggleNotifPanel() {
+    const panel = document.getElementById('notif-panel');
+    if (!panel) return;
+    panel.classList.toggle('active');
+    
+    // Close user menu if open
+    const userMenu = document.getElementById('user-menu');
+    if (userMenu) userMenu.classList.remove('active');
+}
+
+function updateNotifications() {
+    const list = policies.filter(p => p.status === 'Yaklaşan');
+    const badge = document.getElementById('notif-count');
+    const panelList = document.getElementById('notif-list');
+    const summary = document.getElementById('notif-summary');
+    
+    if (badge) {
+        badge.textContent = list.length;
+        badge.style.display = list.length > 0 ? 'flex' : 'none';
+    }
+    
+    if (summary) {
+        summary.textContent = list.length > 0 ? `${list.length} poliçenin vadesi yaklaşıyor` : 'Vadesi yaklaşan poliçe yok';
+    }
+    
+    if (panelList) {
+        if (list.length === 0) {
+            panelList.innerHTML = '<div class="notif-empty">Vadesi yaklaşan poliçe yok.</div>';
+        } else {
+            panelList.innerHTML = list.sort((a,b)=>a.days_left - b.days_left).map(p => `
+                <div class="notif-item" onclick="showPage('renewals'); toggleNotifPanel();">
+                    <span class="notif-title">${escapeHtml(p.customer_name)}</span>
+                    <span class="notif-desc">${escapeHtml(p.policy_no)} - ${escapeHtml(p.branch)}</span>
+                    <span class="notif-time">${p.days_left} Gün Kaldı</span>
+                </div>
+            `).join('');
+        }
+    }
+}
+
 function normalizeKey(v) { return normalizeText(v).toLocaleLowerCase('tr-TR'); }
 function digitsOnly(v) { return normalizeText(v).replace(/\D+/g, ''); }
 function escapeHtml(v) { return normalizeText(v).replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s])); }
@@ -757,8 +797,12 @@ async function loadData() {
         if(Array.isArray(sData)) {
             settings.companies = [...new Set(sData.filter(s => normalizeKey(s.type) === 'company').map(s => normalizeText(s.value)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
             settings.branches = [...new Set(sData.filter(s => normalizeKey(s.type) === 'branch').map(s => normalizeText(s.value)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'tr'));
+            settings.renewalActions = [...new Set(sData.filter(s => normalizeKey(s.type) === 'action').map(s => normalizeText(s.value)).filter(Boolean))];
+            if(settings.renewalActions.length === 0) settings.renewalActions = ["Aranmadı", "Arandı / Düşünüyor", "Teklif Verildi", "Yenilendi"];
             updateFormDropdowns();
         }
+
+        updateNotifications();
 
         computeStatuses(); renderKpis(); renderCharts(); renderPolicies(); renderCustomers();
         populateReportFilters();
@@ -1019,6 +1063,9 @@ function renderSettingsMgmt() {
     document.getElementById('list-branches').innerHTML = settings.branches.map(b => `
         <tr><td>${b}</td><td style="text-align:right;"><button class="btn btn-outline" style="padding:2px 5px; color:var(--danger);" onclick="deleteSetting('branch', '${b}')"><i data-lucide="trash-2" style="width:12px;"></i></button></td></tr>
     `).join('');
+    document.getElementById('list-actions').innerHTML = settings.renewalActions.map(a => `
+        <tr><td>${a}</td><td style="text-align:right;"><button class="btn btn-outline" style="padding:2px 5px; color:var(--danger);" onclick="deleteSetting('action', '${a}')"><i data-lucide="trash-2" style="width:12px;"></i></button></td></tr>
+    `).join('');
     lucide.createIcons();
 }
 
@@ -1177,7 +1224,7 @@ function renderRenewals() {
 
     document.getElementById('table-renewals').innerHTML = list.map(p => {
         let text = p.days_left < 0 ? `${Math.abs(p.days_left)} Gün Geçti` : `${p.days_left} Gün Kaldı`;
-        const options = ["Aranmadı", "Arandı / Düşünüyor", "Teklif Verildi", "Yenilendi"];
+        const options = settings.renewalActions.length > 0 ? settings.renewalActions : ["Aranmadı", "Arandı / Düşünüyor", "Teklif Verildi", "Yenilendi"];
         const selectHtml = `<select class="form-control" style="padding:4px; font-size:0.8rem; border-radius:6px;" onchange="updateRenewalNote('${p.id}', this.value)">
             ${options.map(opt => `<option value="${opt}" ${p.notes === opt ? 'selected' : ''}>${opt}</option>`).join('')}
         </select>`;
