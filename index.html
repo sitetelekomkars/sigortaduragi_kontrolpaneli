@@ -77,6 +77,7 @@
             <a href="#" class="nav-item" data-page="reports"><i data-lucide="bar-chart-2"></i> <span>Raporlar</span></a>
             <a href="#" class="nav-item" data-page="commissions"><i data-lucide="pie-chart"></i> <span>Komisyon</span></a>
             <a href="#" class="nav-item" data-page="birthdays"><i data-lucide="gift"></i> <span>Doğum Günleri</span></a>
+            <a href="#" class="nav-item admin-only" data-page="settings-mgmt"><i data-lucide="settings-2"></i> <span>Yönetim / Ayarlar</span></a>
             <div style="flex:1;"></div>
         </nav>
     </aside>
@@ -94,7 +95,21 @@
             </div>
             <div class="header-right">
                 <button class="icon-btn" id="theme-toggle" title="Karanlık Mod"><i data-lucide="moon"></i></button>
-                <button class="icon-btn" title="Bildirimler"><i data-lucide="bell"></i></button>
+                <div class="notification-wrapper">
+                    <button class="icon-btn" title="Bildirimler" id="notif-btn" onclick="toggleNotifPanel()">
+                        <i data-lucide="bell"></i>
+                        <span class="notif-badge" id="notif-count" style="display:none;">0</span>
+                    </button>
+                    <div class="notif-panel" id="notif-panel">
+                        <div class="notif-header">
+                            <h3>Bildirimler</h3>
+                            <span id="notif-summary">Vadesi yaklaşan poliçe yok</span>
+                        </div>
+                        <div class="notif-list" id="notif-list">
+                            <!-- Notifications injected here -->
+                        </div>
+                    </div>
+                </div>
                 <div class="user-profile" onclick="document.getElementById('user-menu').classList.toggle('active')">
                     <div class="user-avatar" id="header-avatar">U</div>
                     <div class="user-info">
@@ -452,7 +467,7 @@
 
             <!-- SETTINGS MGMT (Yönetim) -->
             <div id="settings-mgmt" class="page-section">
-                <div class="charts-grid" style="grid-template-columns: 1fr 1fr;">
+                <div class="charts-grid" style="grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));">
                     <div class="glass-panel">
                         <div class="panel-header"><h2>Şirketler</h2></div>
                         <div style="display:flex; gap:10px; margin-bottom:1rem;">
@@ -473,6 +488,17 @@
                         <table style="font-size: 0.85rem;">
                             <thead><tr><th>Branş Adı</th><th style="text-align:right;">İşlem</th></tr></thead>
                             <tbody id="list-branches"></tbody>
+                        </table>
+                    </div>
+                    <div class="glass-panel">
+                        <div class="panel-header"><h2>Yenileme Aksiyonları</h2></div>
+                        <div style="display:flex; gap:10px; margin-bottom:1rem;">
+                            <input type="text" id="new-action-name" placeholder="Yeni Aksiyon..." style="flex:1;">
+                            <button class="btn btn-primary" onclick="addSetting('action')">Ekle</button>
+                        </div>
+                        <table style="font-size: 0.85rem;">
+                            <thead><tr><th>Aksiyon Adı</th><th style="text-align:right;">İşlem</th></tr></thead>
+                            <tbody id="list-actions"></tbody>
                         </table>
                     </div>
                 </div>
