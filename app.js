@@ -1538,6 +1538,7 @@ if(fileInput) {
                         body: JSON.stringify({
                             action: 'uploadFile',
                             apiKey: sdApiKey,
+                            sessionToken: sessionToken,
                             fileName: file.name,
                             mimeType: file.type,
                             base64: base64
