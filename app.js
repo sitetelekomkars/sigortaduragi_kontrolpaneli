@@ -42,17 +42,38 @@ function parseAmount(val) {
 function cleanDate(d) {
     if(!d) return '';
     try {
-        const dt = new Date(d);
-        if(isNaN(dt.getTime())) {
-            // Try to return as-is if it's already a dot-formatted string
-            const s = d.toString().split('T')[0];
-            return s;
-        }
+        const dt = parseDateAny(d);
+        if(isNaN(dt.getTime())) return d.toString();
         const dd = String(dt.getDate()).padStart(2,'0');
         const mm = String(dt.getMonth()+1).padStart(2,'0');
-        const yyyy = dt.getFullYear();
-        return `${dd}.${mm}.${yyyy}`;
-    } catch { return d.toString().split('T')[0]; }
+        return `${dd}.${mm}.${dt.getFullYear()}`;
+    } catch { return d.toString(); }
+}
+function formatDateForInput(d) {
+    if(!d) return '';
+    const dt = parseDateAny(d);
+    if(isNaN(dt.getTime())) return '';
+    return dt.toISOString().split('T')[0];
+}
+function parseDateAny(d) {
+    if(!d) return new Date(NaN);
+    if(d instanceof Date) return d;
+    let s = d.toString().trim();
+    // Check for DD.MM.YYYY
+    if(/^\d{2}\.\d{2}\.\d{4}/.test(s)) {
+        const parts = s.split('.');
+        return new Date(parts[2], parts[1]-1, parts[0]);
+    }
+    return new Date(s);
+}
+function handleStartDateChange() {
+    const startEl = document.getElementById('p_start');
+    const expiryEl = document.getElementById('p_expiry');
+    if(!startEl || !expiryEl || !startEl.value) return;
+    const d = new Date(startEl.value);
+    if(isNaN(d.getTime())) return;
+    d.setFullYear(d.getFullYear() + 1);
+    expiryEl.value = d.toISOString().split('T')[0];
 }
 function fmtCy(v) { return new Intl.NumberFormat('tr-TR', {style:'currency', currency:'TRY'}).format(v||0); }
 function showToast(msg, type='info') { const c=document.getElementById('toast-container'); if(!c) return; const t=document.createElement('div'); t.className=`toast ${type}`; t.innerHTML=`<i data-lucide="${type==='error'?'alert-octagon':'check-circle'}"></i><span>${escapeHtml(msg)}</span>`; c.appendChild(t); lucide.createIcons(); setTimeout(()=>t.remove(),4000); }
@@ -68,18 +89,24 @@ function matchOptionValue(list = [], value = '') {
     return found || clean;
 }
 function normalizePolicyRecord(p = {}) {
+    const toISO = (d) => {
+        if(!d) return null;
+        const dt = new Date(d);
+        if(isNaN(dt.getTime())) return d; // Return as-is if already a string like "24.03.2024" which new Date might fail
+        return dt.toISOString().split('T')[0];
+    };
     return {
         ...p,
         id: p.id || p.ID || Date.now() + Math.random(),
         status: normalizeText(p.status) || 'Aktif',
-        issue_date: cleanDate(p.issue_date || p.issueDate || p.tanzim_tarihi || p.tanzim),
-        start_date: cleanDate(p.start_date || p.startDate || p.police_baslangic || p.baslangic_tarihi || p.issue_date),
-        expiry_date: cleanDate(p.expiry_date || p.expiryDate || p.police_bitis || p.vade || p.bitis_tarihi),
+        issue_date: toISO(p.issue_date || p.issueDate || p.tanzim_tarihi || p.tanzim),
+        start_date: toISO(p.start_date || p.startDate || p.police_baslangic || p.baslangic_tarihi),
+        expiry_date: toISO(p.expiry_date || p.expiryDate || p.police_bitis || p.vade || p.bitis_tarihi),
         policy_no: normalizeText(p.policy_no || p.police_no || p.police || p.policyNumber),
         customer_name: normalizeText(p.customer_name || p.musteri || p.customer || p.musteri_ad_soyad || p.unvan),
         customer_id: normalizeText(p.customer_id || p.tc_vkn || p.tc || p.vkn),
         phone: digitsOnly(p.phone || p.telefon),
-        birth_date: cleanDate(p.birth_date || p.dogum_tarihi),
+        birth_date: toISO(p.birth_date || p.dogum_tarihi),
         ek_no: parseInt(p.ek_no ?? p.ekno ?? p.ekNo ?? 0, 10) || 0,
         region: normalizeText(p.region || p.bolge),
         company: normalizeText(p.company || p.sirket || p.company_name),
@@ -731,6 +758,7 @@ async function loadData() {
         computeStatuses(); renderKpis(); renderCharts(); renderPolicies(); renderCustomers();
         populateReportFilters();
         renderReports();
+        renderFinanceTable();
         const active = document.querySelector('.page-section.active')?.id;
         if(active === 'proposals') renderProposals();
         if(active === 'documents') renderDocumentsTable();
@@ -893,7 +921,7 @@ function renderPolicies() {
     if(!tbody) return;
 
     if (!list.length) {
-        tbody.innerHTML = `<tr><td colspan="10"><div class="empty-state">Kriterlere uygun poliçe bulunamadı.</div></td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="11"><div class="empty-state">Kriterlere uygun poliçe bulunamadı.</div></td></tr>`;
         return;
     }
 
@@ -905,6 +933,7 @@ function renderPolicies() {
         <td>${escapeHtml(p.customer_name)}</td>
         <td>${escapeHtml(p.company)}</td>
         <td>${escapeHtml(p.branch)}</td>
+        <td><span style="color:var(--primary); font-weight:600; font-size:0.8rem;">${escapeHtml(p.description || '-')}</span></td>
         <td><strong>${fmtCy(p.gross_premium)}</strong></td>
         <td><strong>${fmtCy(p.net_premium)}</strong></td>
         <td>
@@ -925,7 +954,19 @@ function renderPolicies() {
 async function renderFinanceTable() {
     const tbody = document.getElementById('table-finance');
     if(!tbody) return;
-    tbody.innerHTML = finance.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(f => `
+    
+    const year = document.getElementById('filter-finance-year')?.value;
+    const month = document.getElementById('filter-finance-month')?.value;
+    
+    const filtered = finance.filter(f => {
+        const d = new Date(f.date);
+        if(isNaN(d.getTime())) return true; // Show invalid dates for safety
+        const matchesYear = !year || d.getFullYear().toString() === year;
+        const matchesMonth = !month || month === 'all' || d.getMonth().toString() === month;
+        return matchesYear && matchesMonth;
+    });
+
+    tbody.innerHTML = filtered.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(f => `
         <tr>
             <td>${cleanDate(f.date)}</td>
             <td><span class="badge ${f.type==='Gelir'?'badge-success':'badge-danger'}">${f.type}</span></td>
@@ -1092,12 +1133,17 @@ function renewPolicy(id) {
     
     // Date Logic: New Start = Old Expiry, New Expiry = New Start + 1 Year
     const today = new Date().toISOString().split('T')[0];
-    const oldExpiry = p.expiry_date ? new Date(p.expiry_date).toISOString().split('T')[0] : today;
+    let startVal = today;
+    if (p.expiry_date) {
+        // p.expiry_date is stored as ISO or DD.MM.YYYY
+        const d = parseDateAny(p.expiry_date);
+        if(!isNaN(d.getTime())) startVal = d.toISOString().split('T')[0];
+    }
     
     document.getElementById('p_issue').value = today;
-    document.getElementById('p_start').value = oldExpiry;
+    document.getElementById('p_start').value = startVal;
     
-    const expDate = new Date(oldExpiry);
+    const expDate = new Date(startVal);
     expDate.setFullYear(expDate.getFullYear() + 1);
     document.getElementById('p_expiry').value = expDate.toISOString().split('T')[0];
     
@@ -1179,18 +1225,22 @@ function renderCustomers() {
 }
 
 function populateReportFilters() {
-    const yearSelect = document.getElementById('filter-report-year');
-    if(!yearSelect) return;
     const currentYear = new Date().getFullYear();
-    const years = [...new Set(policies.map(p => {
-        const d = new Date(p.issue_date);
-        return isNaN(d.getTime()) ? null : d.getFullYear();
-    }).filter(Boolean))];
-    if(!years.includes(currentYear)) years.push(currentYear);
-    years.sort((a,b) => b - a);
-    const prevVal = yearSelect.value;
-    yearSelect.innerHTML = years.map(y => `<option value="${y}" ${y == currentYear && !prevVal ? 'selected' : ''}>${y}</option>`).join('');
-    if(prevVal && years.includes(parseInt(prevVal))) yearSelect.value = prevVal;
+    const allYears = [...new Set([
+        ...policies.map(p => { const d = new Date(p.issue_date); return isNaN(d.getTime()) ? null : d.getFullYear(); }),
+        ...finance.map(f => { const d = new Date(f.date); return isNaN(d.getTime()) ? null : d.getFullYear(); })
+    ].filter(Boolean))];
+    if(!allYears.includes(currentYear)) allYears.push(currentYear);
+    allYears.sort((a,b) => b - a);
+
+    const yearSelects = ['filter-report-year', 'filter-finance-year'];
+    yearSelects.forEach(id => {
+        const el = document.getElementById(id);
+        if(!el) return;
+        const prevVal = el.value;
+        el.innerHTML = allYears.map(y => `<option value="${y}" ${y == currentYear && !prevVal ? 'selected' : ''}>${y}</option>`).join('');
+        if(prevVal && allYears.includes(parseInt(prevVal))) el.value = prevVal;
+    });
 }
 
 function renderReports() {
@@ -1394,9 +1444,10 @@ function showDetails(id) {
     document.getElementById('p_customer').value = p.customer_name || '';
     document.getElementById('p_tc').value = digitsOnly(p.customer_id || '');
     document.getElementById('p_phone').value = digitsOnly(p.phone || '');
-    document.getElementById('p_issue').value = cleanDate(p.issue_date);
-    document.getElementById('p_start').value = cleanDate(p.start_date || p.issue_date);
-    document.getElementById('p_expiry').value = cleanDate(p.expiry_date);
+    
+    document.getElementById('p_issue').value = formatDateForInput(p.issue_date);
+    document.getElementById('p_start').value = formatDateForInput(p.start_date || p.issue_date);
+    document.getElementById('p_expiry').value = formatDateForInput(p.expiry_date);
     document.getElementById('p_net').value = p.net_premium || 0;
     document.getElementById('p_gross').value = p.gross_premium || 0;
     document.getElementById('p_comm').value = p.commission || 0;
@@ -1644,9 +1695,20 @@ if(fileInput) {
 function exportToExcel() {
     if(typeof XLSX === 'undefined') { showToast("XLSX kütüphanesi yüklenmedi!", "error"); return; }
     
+    // === FILTRELEME ===
+    const year = document.getElementById('filter-report-year')?.value;
+    const month = document.getElementById('filter-report-month')?.value;
+    const filteredPolicies = policies.filter(p => {
+        const d = new Date(p.issue_date);
+        if(isNaN(d.getTime())) return false;
+        const matchesYear = d.getFullYear().toString() === year;
+        const matchesMonth = month === 'all' || d.getMonth().toString() === month;
+        return matchesYear && matchesMonth;
+    });
+
     // === SAYFA 1: ÖZET ===
     const summary = {}; let tNet=0, tBrut=0, tKom=0, tPol=0, tZeyil=0;
-    policies.forEach(p => {
+    filteredPolicies.forEach(p => {
         const c = p.company || 'DİĞER';
         if (!summary[c]) summary[c] = { p:0, z:0, n:0, b:0, k:0 };
         if ((p.ek_no||0) > 0) { summary[c].z++; tZeyil++; } else { summary[c].p++; tPol++; }
@@ -1674,7 +1736,7 @@ function exportToExcel() {
 
     // === SAYFA 2: HAM VERİ ===
     const ws_ham = [["Tanzim Tarihi","Başlangıç","Bitiş","Poliçe No","Müşteri","TC/VKN","Şirket","Branş (Tür)","Plaka/Açıklama","Net Prim (₺)","Brüt Prim (₺)","Komisyon (₺)","Durum"]];
-    [...policies].sort((a,b)=>new Date(b.issue_date||0)-new Date(a.issue_date||0)).forEach(p => {
+    [...filteredPolicies].sort((a,b)=>new Date(b.issue_date||0)-new Date(a.issue_date||0)).forEach(p => {
         ws_ham.push([
             cleanDate(p.issue_date),
             cleanDate(p.start_date),
@@ -1701,8 +1763,19 @@ function exportToExcel() {
 
 function exportFinanceToExcel() {
     if(typeof XLSX === 'undefined') { showToast("XLSX kütüphanesi yüklenmedi!", "error"); return; }
+
+    const year = document.getElementById('filter-finance-year')?.value;
+    const month = document.getElementById('filter-finance-month')?.value;
+    const filtered = finance.filter(f => {
+        const d = new Date(f.date);
+        if(isNaN(d.getTime())) return true;
+        const matchesYear = !year || d.getFullYear().toString() === year;
+        const matchesMonth = !month || month === 'all' || d.getMonth().toString() === month;
+        return matchesYear && matchesMonth;
+    });
+
     const ws_data = [["Tarih", "Tür", "Kategori", "Açıklama", "Tutar (₺)"]];
-    finance.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(f => {
+    filtered.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(f => {
         ws_data.push([
             cleanDate(f.date),
             f.type,
@@ -1715,6 +1788,58 @@ function exportFinanceToExcel() {
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws_data), "Bilanço");
     XLSX.writeFile(wb, "Bilanco_" + cleanDate(new Date()) + ".xlsx");
     showToast("Bilanço Excel İndirildi", "success");
+}
+
+function renderBirthdays() {
+    const tbody = document.getElementById('table-birthdays');
+    if(!tbody) return;
+    const today = new Date();
+    const todayStr = String(today.getDate()).padStart(2,'0') + '.' + String(today.getMonth()+1).padStart(2,'0');
+    const customerMap = {};
+    policies.forEach(p => {
+        const name = (p.customer_name || "").toString().trim();
+        if(!name) return;
+        if(!customerMap[name] || new Date(p.issue_date) > new Date(customerMap[name].latest)) {
+            customerMap[name] = { name: name, birth_date: p.birth_date, phone: p.phone, latest: p.issue_date, policy: p.policy_no };
+        }
+    });
+    const bdayList = Object.values(customerMap).filter(c => c.birth_date && c.birth_date.startsWith(todayStr));
+    document.getElementById('birthday-count').textContent = `${bdayList.length} Kişi`;
+    if(bdayList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:3rem; color:var(--text-muted);">Bugün doğum günü olan müşteri bulunamadı.</td></tr>`;
+        return;
+    }
+    tbody.innerHTML = bdayList.map(c => {
+        const msg = encodeURIComponent(`Sayın ${c.name}, Sigorta Durağı olarak doğum gününüzü kutlar, sağlıklı ve mutlu yıllar dileriz! 🎂🎈`);
+        const waPhone = (c.phone || "").replace(/[^0-9]/g, "");
+        const waLink = waPhone ? `https://wa.me/90${waPhone.length === 10 ? waPhone : waPhone.slice(-10)}?text=${msg}` : "#";
+        return `<tr>
+            <td><strong>${c.name}</strong></td>
+            <td>${c.birth_date}</td>
+            <td>${c.phone || '-'}</td>
+            <td><small>${c.policy || '-'}</small></td>
+            <td>
+                <a href="${waLink}" target="_blank" class="btn btn-outline" style="color:#25D366; border-color:#25D366; padding:6px 12px; font-size:0.8rem;">
+                    <i data-lucide="message-circle" style="width:14px; margin-right:5px;"></i> Kutla (WhatsApp)
+                </a>
+            </td>
+        </tr>`;
+    }).join('');
+    lucide.createIcons();
+}
+
+function showPage(pageId) {
+    document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    const target = document.getElementById(pageId);
+    if(target) target.classList.add('active');
+    const nav = document.querySelector(`.nav-item[data-page="${pageId}"]`);
+    if(nav) nav.classList.add('active');
+    if(pageId === 'renewals') renderRenewals();
+    if(pageId === 'reports') renderReports();
+    if(pageId === 'finance') renderFinanceTable();
+    if(pageId === 'birthdays') renderBirthdays();
+    document.querySelector('.sidebar').classList.remove('active');
 }
 
 attachUiEvents();
