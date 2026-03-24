@@ -523,8 +523,13 @@ function showPage(id) {
         if(n.getAttribute('data-page') === id) n.classList.add('active');
     });
     document.querySelectorAll('.page-section').forEach(p=>p.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
+    
+    const target = document.getElementById(id);
+    if(target) target.classList.add('active');
+
     document.getElementById('user-menu').classList.remove('active'); // Close menu on navigation
+    const sidebar = document.querySelector('.sidebar');
+    if(sidebar) sidebar.classList.remove('active'); // Close mobile sidebar
     
     if(id === 'dashboard') { renderKpis(); renderCharts(); }
     if(id === 'policies') renderPolicies();
@@ -538,6 +543,7 @@ function showPage(id) {
     if(id === 'finance') renderFinanceTable();
     if(id === 'settings-mgmt') renderSettingsMgmt();
     if(id === 'commissions') renderCommissionSummary();
+    if(id === 'birthdays') renderBirthdays();
     
     logAction('SAYFA_GECIS', id);
 }
@@ -1880,19 +1886,6 @@ function renderBirthdays() {
     lucide.createIcons();
 }
 
-function showPage(pageId) {
-    document.querySelectorAll('.page-section').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-    const target = document.getElementById(pageId);
-    if(target) target.classList.add('active');
-    const nav = document.querySelector(`.nav-item[data-page="${pageId}"]`);
-    if(nav) nav.classList.add('active');
-    if(pageId === 'renewals') renderRenewals();
-    if(pageId === 'reports') renderReports();
-    if(pageId === 'finance') renderFinanceTable();
-    if(pageId === 'birthdays') renderBirthdays();
-    document.querySelector('.sidebar').classList.remove('active');
-}
 
 attachUiEvents();
 init();
