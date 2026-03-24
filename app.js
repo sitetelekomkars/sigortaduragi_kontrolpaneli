@@ -89,34 +89,38 @@ function matchOptionValue(list = [], value = '') {
     return found || clean;
 }
 function normalizePolicyRecord(p = {}) {
+    const findField = (aliases) => {
+        for(let a of aliases) if(p[a] !== undefined && p[a] !== null) return p[a];
+        return null;
+    };
     const toISO = (d) => {
         if(!d) return null;
-        const dt = new Date(d);
-        if(isNaN(dt.getTime())) return d; // Return as-is if already a string like "24.03.2024" which new Date might fail
+        const dt = parseDateAny(d);
+        if(isNaN(dt.getTime())) return d.toString(); 
         return dt.toISOString().split('T')[0];
     };
     return {
         ...p,
         id: p.id || p.ID || Date.now() + Math.random(),
-        status: normalizeText(p.status) || 'Aktif',
-        issue_date: toISO(p.issue_date || p.issueDate || p.tanzim_tarihi || p.tanzim),
-        start_date: toISO(p.start_date || p.startDate || p.police_baslangic || p.baslangic_tarihi),
-        expiry_date: toISO(p.expiry_date || p.expiryDate || p.police_bitis || p.vade || p.bitis_tarihi),
-        policy_no: normalizeText(p.policy_no || p.police_no || p.police || p.policyNumber),
-        customer_name: normalizeText(p.customer_name || p.musteri || p.customer || p.musteri_ad_soyad || p.unvan),
-        customer_id: normalizeText(p.customer_id || p.tc_vkn || p.tc || p.vkn),
-        phone: digitsOnly(p.phone || p.telefon),
-        birth_date: toISO(p.birth_date || p.dogum_tarihi),
-        ek_no: parseInt(p.ek_no ?? p.ekno ?? p.ekNo ?? 0, 10) || 0,
-        region: normalizeText(p.region || p.bolge),
-        company: normalizeText(p.company || p.sirket || p.company_name),
-        branch: normalizeText(p.branch || p.brans || p.branch_name),
-        description: normalizeText(p.description || p.aciklama || p.plaka),
-        net_premium: parseAmount(p.net_premium ?? p.net ?? p.netPrim),
-        gross_premium: parseAmount(p.gross_premium ?? p.gross ?? p.brut_prim ?? p.brutPrim),
-        commission: parseAmount(p.commission ?? p.komisyon),
-        notes: normalizeText(p.notes || p.note || p.notlar),
-        doc_url: normalizeText(p.doc_url || p.document_url || p.evrak_url || p.drive_url)
+        status: normalizeText(findField(['status', 'durum'])) || 'Aktif',
+        issue_date: toISO(findField(['issue_date', 'issueDate', 'tanzim_tarihi', 'tanzim'])),
+        start_date: toISO(findField(['start_date', 'startDate', 'police_baslangic', 'baslangic_tarihi', 'issue_date'])),
+        expiry_date: toISO(findField(['expiry_date', 'expiryDate', 'police_bitis', 'vade', 'bitis_tarihi'])),
+        policy_no: normalizeText(findField(['policy_no', 'police_no', 'police', 'policyNumber'])),
+        customer_name: normalizeText(findField(['customer_name', 'musteri', 'customer', 'musteri_ad_soyad', 'unvan'])),
+        customer_id: normalizeText(findField(['customer_id', 'tc_vkn', 'tc', 'vkn', 'tc_no', 'vkn_no'])),
+        phone: digitsOnly(findField(['phone', 'telefon', 'tel', 'gsm'])),
+        birth_date: toISO(findField(['birth_date', 'dogum_tarihi'])),
+        ek_no: parseInt(findField(['ek_no', 'ekno', 'ekNo']) ?? 0, 10) || 0,
+        region: normalizeText(findField(['region', 'bolge'])),
+        company: normalizeText(findField(['company', 'sirket', 'company_name'])),
+        branch: normalizeText(findField(['branch', 'brans', 'branch_name'])),
+        description: normalizeText(findField(['description', 'aciklama', 'plaka'])),
+        net_premium: parseAmount(findField(['net_premium', 'net', 'netPrim'])),
+        gross_premium: parseAmount(findField(['gross_premium', 'gross', 'brut_prim', 'brutPrim'])),
+        commission: parseAmount(findField(['commission', 'komisyon'])),
+        notes: normalizeText(findField(['notes', 'note', 'notlar'])),
+        doc_url: normalizeText(findField(['doc_url', 'document_url', 'evrak_url', 'drive_url']))
     };
 }
 function setSelectValue(elId, value, sourceList = []) {
@@ -145,6 +149,7 @@ function resetPolicyForm() {
     if (submitBtn) submitBtn.innerHTML = '<i data-lucide="save"></i> Kaydet';
     document.getElementById('p_ek').value = 0;
     document.getElementById('p_doc_url').value = '';
+    document.getElementById('p_birth').value = '';
     const fileContainer = document.getElementById('file-list-container');
     if (fileContainer) fileContainer.innerHTML = '';
     updateFormDropdowns();
@@ -1118,45 +1123,41 @@ function renewPolicy(id) {
     const p = normalizePolicyRecord(policies.find(x => x.id == id) || {}); 
     if(!p.id) return;
     
-    // Reset form to clear any previous updateId
     resetPolicyForm();
     
-    // We are creating a NEW policy based on the old one
-    // So we DON'T set dataset.updateId
-    
-    // Fill the form with old data
-    document.getElementById('p_no').value = p.policy_no || '';
-    document.getElementById('p_ek').value = 0; // New policy year usually starts with Ek: 0
-    document.getElementById('p_customer').value = p.customer_name || '';
-    document.getElementById('p_tc').value = digitsOnly(p.customer_id || '');
-    document.getElementById('p_phone').value = digitsOnly(p.phone || '');
-    
-    // Date Logic: New Start = Old Expiry, New Expiry = New Start + 1 Year
-    const today = new Date().toISOString().split('T')[0];
-    let startVal = today;
-    if (p.expiry_date) {
-        // p.expiry_date is stored as ISO or DD.MM.YYYY
-        const d = parseDateAny(p.expiry_date);
-        if(!isNaN(d.getTime())) startVal = d.toISOString().split('T')[0];
-    }
-    
-    document.getElementById('p_issue').value = today;
-    document.getElementById('p_start').value = startVal;
-    
-    const expDate = new Date(startVal);
-    expDate.setFullYear(expDate.getFullYear() + 1);
-    document.getElementById('p_expiry').value = expDate.toISOString().split('T')[0];
-    
-    document.getElementById('p_net').value = 0; // Zero out premiums as they change
-    document.getElementById('p_gross').value = 0;
-    document.getElementById('p_comm').value = 0;
-    document.getElementById('p_desc').value = p.description || '';
-    document.getElementById('p_note').value = 'YENİLEME';
-    document.getElementById('p_doc_url').value = ''; // Don't copy old documents
-    
-    setSelectValue('p_company', p.company, settings.companies);
-    setSelectValue('p_branch', p.branch, settings.branches);
-    updateFormDropdowns();
+    const fill = () => {
+        document.getElementById('p_no').value = p.policy_no || '';
+        document.getElementById('p_ek').value = 0;
+        document.getElementById('p_customer').value = p.customer_name || '';
+        document.getElementById('p_tc').value = p.customer_id || '';
+        document.getElementById('p_phone').value = p.phone || '';
+        document.getElementById('p_birth').value = formatDateForInput(p.birth_date);
+        
+        const today = new Date().toISOString().split('T')[0];
+        let startVal = today;
+        if (p.expiry_date) {
+            const d = parseDateAny(p.expiry_date);
+            if(!isNaN(d.getTime())) startVal = d.toISOString().split('T')[0];
+        }
+        
+        document.getElementById('p_issue').value = today;
+        document.getElementById('p_start').value = startVal;
+        
+        const expDate = new Date(startVal);
+        expDate.setFullYear(expDate.getFullYear() + 1);
+        document.getElementById('p_expiry').value = expDate.toISOString().split('T')[0];
+        
+        document.getElementById('p_net').value = 0;
+        document.getElementById('p_gross').value = 0;
+        document.getElementById('p_comm').value = 0;
+        document.getElementById('p_desc').value = p.description || '';
+        document.getElementById('p_note').value = 'YENİLEME';
+        document.getElementById('p_doc_url').value = '';
+        
+        setSelectValue('p_company', p.company, settings.companies);
+        setSelectValue('p_branch', p.branch, settings.branches);
+        lucide.createIcons();
+    };
 
     const title = document.getElementById('policy-drawer-title');
     const submitBtn = document.getElementById('policy-submit-btn');
@@ -1164,7 +1165,8 @@ function renewPolicy(id) {
     if (submitBtn) submitBtn.innerHTML = '<i data-lucide="refresh-cw"></i> Yenilemeyi Kaydet';
     
     openDrawer('policy-drawer');
-    showToast("Poliçe bilgileri kopyalandı. Lütfen yeni prim miktarını girin.", "info");
+    fill();
+    showToast("Poliçe bilgileri kopyalandı. Lütfen yeni prim miktarını girin.", "success");
 }
 
 function renderRenewals() {
@@ -1442,18 +1444,21 @@ function showDetails(id) {
     document.getElementById('p_no').value = p.policy_no || '';
     document.getElementById('p_ek').value = p.ek_no || 0;
     document.getElementById('p_customer').value = p.customer_name || '';
-    document.getElementById('p_tc').value = digitsOnly(p.customer_id || '');
-    document.getElementById('p_phone').value = digitsOnly(p.phone || '');
+    document.getElementById('p_tc').value = p.customer_id || '';
+    document.getElementById('p_phone').value = p.phone || '';
+    document.getElementById('p_birth').value = formatDateForInput(p.birth_date);
     
     document.getElementById('p_issue').value = formatDateForInput(p.issue_date);
-    document.getElementById('p_start').value = formatDateForInput(p.start_date || p.issue_date);
+    document.getElementById('p_start').value = formatDateForInput(p.start_date);
     document.getElementById('p_expiry').value = formatDateForInput(p.expiry_date);
+    
     document.getElementById('p_net').value = p.net_premium || 0;
     document.getElementById('p_gross').value = p.gross_premium || 0;
     document.getElementById('p_comm').value = p.commission || 0;
     document.getElementById('p_desc').value = p.description || '';
     document.getElementById('p_note').value = p.notes || '';
     document.getElementById('p_doc_url').value = p.doc_url || '';
+    
     setSelectValue('p_company', p.company, settings.companies);
     setSelectValue('p_branch', p.branch, settings.branches);
 
@@ -1507,7 +1512,7 @@ if (formPolicy) {
             customer_name: document.getElementById('p_customer').value.toUpperCase(),
             customer_id: document.getElementById('p_tc').value,
             phone: document.getElementById('p_phone').value,
-            birth_date: "", // Şimdilik boş, formda alanı yoksa
+            birth_date: document.getElementById('p_birth').value,
             ek_no: parseInt(document.getElementById('p_ek').value) || 0,
             region: "", // Şimdilik boş
             company: document.getElementById('p_company').value,
