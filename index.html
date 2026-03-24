@@ -76,6 +76,7 @@
             <a href="#" class="nav-item" data-page="finance"><i data-lucide="wallet"></i> <span>Bilanço</span></a>
             <a href="#" class="nav-item" data-page="reports"><i data-lucide="bar-chart-2"></i> <span>Raporlar</span></a>
             <a href="#" class="nav-item" data-page="commissions"><i data-lucide="pie-chart"></i> <span>Komisyon</span></a>
+            <a href="#" class="nav-item" data-page="birthdays"><i data-lucide="gift"></i> <span>Doğum Günleri</span></a>
             <div style="flex:1;"></div>
         </nav>
     </aside>
@@ -192,9 +193,10 @@
                                 <th>Başlangıç</th>
                                 <th>Bitiş</th>
                                 <th>Poliçe No</th>
-                                <th>Sigortalı</th>
+                                <th>Müşteri</th>
                                 <th>Şirket</th>
                                 <th>Branş</th>
+                                <th>Plaka</th>
                                 <th>Brüt Prim</th>
                                 <th>Net Prim</th>
                                 <th>İşlem</th>
@@ -300,7 +302,23 @@
                 <div class="glass-panel">
                     <div class="panel-header">
                         <h2>Gelir / Gider (Bilanço)</h2>
-                        <div style="display:flex; gap:10px;">
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <select id="filter-finance-year" onchange="renderFinanceTable()" style="width:100px;"></select>
+                            <select id="filter-finance-month" onchange="renderFinanceTable()" style="width:120px;">
+                                <option value="all">Tüm Aylar</option>
+                                <option value="0">Ocak</option>
+                                <option value="1">Şubat</option>
+                                <option value="2">Mart</option>
+                                <option value="3">Nisan</option>
+                                <option value="4">Mayıs</option>
+                                <option value="5">Haziran</option>
+                                <option value="6">Temmuz</option>
+                                <option value="7">Ağustos</option>
+                                <option value="8">Eylül</option>
+                                <option value="9">Ekim</option>
+                                <option value="10">Kasım</option>
+                                <option value="11">Aralık</option>
+                            </select>
                             <button class="btn btn-outline" onclick="exportFinanceToExcel()"><i data-lucide="download"></i> Excel'e Aktar</button>
                             <button class="btn btn-primary" onclick="showDrawer('finance-drawer')"><i data-lucide="plus"></i> Yeni Kayıt</button>
                         </div>
@@ -327,8 +345,9 @@
                     <div class="panel-header">
                         <h2>Şirket Bazlı Özet</h2>
                         <div style="display:flex; gap:10px; align-items:center;">
+                            <button class="btn btn-primary" onclick="exportToExcel()" style="padding: 0.6rem 1.2rem; font-size: 0.85rem;"><i data-lucide="file-spreadsheet"></i> Excel'e Aktar</button>
                             <select id="filter-report-year" onchange="renderReports()" style="width:100px;"></select>
-                            <select id="filter-report-month" onchange="renderReports()" style="width:120px;">
+                            <select id="filter-report-month" onchange="renderReports()" style="width:130px;">
                                 <option value="all">Tüm Aylar</option>
                                 <option value="0">Ocak</option>
                                 <option value="1">Şubat</option>
@@ -361,7 +380,10 @@
                     </table>
                 </div>
                 <div class="glass-panel" style="margin-top:1.5rem;">
-                    <div class="panel-header"><h2>Ham Veri — Tüm Poliçeler</h2></div>
+                    <div class="panel-header">
+                        <h2>Ham Veri — Tüm Poliçeler</h2>
+                        <button class="btn btn-outline" onclick="exportToExcel()" style="padding: 0.6rem 1.2rem; font-size: 0.85rem;"><i data-lucide="download"></i> Excel (Ham + Özet)</button>
+                    </div>
                     <div style="overflow-x:auto;">
                         <table style="font-size:0.8rem; min-width:900px;">
                             <thead>
@@ -398,6 +420,33 @@
                         </thead>
                         <tbody id="table-commission-summary"></tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- BIRTHDAYS -->
+            <div id="birthdays" class="page-section">
+                <div class="glass-panel">
+                    <div class="panel-header">
+                        <h2>Doğum Günü Kutlamaları</h2>
+                        <div class="badge badge-primary" id="birthday-count">0 Kişi</div>
+                    </div>
+                    <p style="margin-bottom: 1.5rem; color: var(--text-muted); font-size: 0.9rem;">
+                        Bugün doğum günü olan müşterilerimiz aşağıdadır. Hızlıca WhatsApp kutlama mesajı gönderebilirsiniz.
+                    </p>
+                    <div style="overflow-x:auto;">
+                        <table style="width:100%;">
+                            <thead>
+                                <tr>
+                                    <th>Müşteri Ad Soyad</th>
+                                    <th>Doğum Tarihi</th>
+                                    <th>Telefon</th>
+                                    <th>Son Poliçe</th>
+                                    <th>İşlem</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-birthdays"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -497,7 +546,7 @@
             </div>
             <div style="display:flex; gap:1rem;">
                 <div class="form-group" style="flex:1;"><label>Tanzim Tarihi</label><input type="date" id="p_issue" required></div>
-                <div class="form-group" style="flex:1;"><label>Poliçe Başlangıç</label><input type="date" id="p_start" required></div>
+                <div class="form-group" style="flex:1;"><label>Poliçe Başlangıç</label><input type="date" id="p_start" onchange="handleStartDateChange()" required></div>
             </div>
             <div class="form-group"><label>Poliçe Bitiş (Vade)</label><input type="date" id="p_expiry" required></div>
             
