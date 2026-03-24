@@ -39,7 +39,21 @@ function parseAmount(val) {
     }
     return parseFloat(s.replace(/[^0-9.-]/g, '')) || 0; 
 }
-function cleanDate(d) { if(!d) return ''; try { const dt = new Date(d); if(isNaN(dt.getTime())) return d.split('T')[0]; return dt.toISOString().split('T')[0]; } catch { return d.split('T')[0]; } }
+function cleanDate(d) {
+    if(!d) return '';
+    try {
+        const dt = new Date(d);
+        if(isNaN(dt.getTime())) {
+            // Try to return as-is if it's already a dot-formatted string
+            const s = d.toString().split('T')[0];
+            return s;
+        }
+        const dd = String(dt.getDate()).padStart(2,'0');
+        const mm = String(dt.getMonth()+1).padStart(2,'0');
+        const yyyy = dt.getFullYear();
+        return `${dd}.${mm}.${yyyy}`;
+    } catch { return d.toString().split('T')[0]; }
+}
 function fmtCy(v) { return new Intl.NumberFormat('tr-TR', {style:'currency', currency:'TRY'}).format(v||0); }
 function showToast(msg, type='info') { const c=document.getElementById('toast-container'); if(!c) return; const t=document.createElement('div'); t.className=`toast ${type}`; t.innerHTML=`<i data-lucide="${type==='error'?'alert-octagon':'check-circle'}"></i><span>${escapeHtml(msg)}</span>`; c.appendChild(t); lucide.createIcons(); setTimeout(()=>t.remove(),4000); }
 
@@ -715,6 +729,8 @@ async function loadData() {
         }
 
         computeStatuses(); renderKpis(); renderCharts(); renderPolicies(); renderCustomers();
+        populateReportFilters();
+        renderReports();
         const active = document.querySelector('.page-section.active')?.id;
         if(active === 'proposals') renderProposals();
         if(active === 'documents') renderDocumentsTable();
@@ -1162,19 +1178,70 @@ function renderCustomers() {
     lucide.createIcons();
 }
 
-function renderReports() {
-    const summary = {}; let tP=0, tZ=0, tN=0, tK=0;
-    policies.forEach(p => {
-        const c = p.company || 'DİĞER';
-        if (!summary[c]) summary[c] = { p: 0, z: 0, n: 0, k: 0 };
-        if ((p.ek_no || 0) > 0) { summary[c].z++; tZ++; } else { summary[c].p++; tP++; }
-        summary[c].n += p.net_premium; summary[c].k += p.commission; tN += p.net_premium; tK += p.commission;
-    });
-    document.getElementById('table-reports').innerHTML = Object.entries(summary).map(([name, s]) => {
-        const ratio = tN > 0 ? (s.n/tN*100).toFixed(1) : 0;
-        return `<tr><td><strong>${name}</strong></td><td>${s.p}</td><td>${s.z}</td><td><strong>${fmtCy(s.n)}</strong></td><td>${fmtCy(s.k)}</td><td>%${ratio}</td></tr>`;
-    }).join('');
+function populateReportFilters() {
+    const yearSelect = document.getElementById('filter-report-year');
+    if(!yearSelect) return;
+    const currentYear = new Date().getFullYear();
+    const years = [...new Set(policies.map(p => {
+        const d = new Date(p.issue_date);
+        return isNaN(d.getTime()) ? null : d.getFullYear();
+    }).filter(Boolean))];
+    if(!years.includes(currentYear)) years.push(currentYear);
+    years.sort((a,b) => b - a);
+    const prevVal = yearSelect.value;
+    yearSelect.innerHTML = years.map(y => `<option value="${y}" ${y == currentYear && !prevVal ? 'selected' : ''}>${y}</option>`).join('');
+    if(prevVal && years.includes(parseInt(prevVal))) yearSelect.value = prevVal;
 }
+
+function renderReports() {
+    const year = document.getElementById('filter-report-year')?.value;
+    const month = document.getElementById('filter-report-month')?.value;
+    
+    const filteredPolicies = policies.filter(p => {
+        const d = new Date(p.issue_date);
+        if(isNaN(d.getTime())) return false;
+        const matchesYear = d.getFullYear().toString() === year;
+        const matchesMonth = month === 'all' || d.getMonth().toString() === month;
+        return matchesYear && matchesMonth;
+    });
+
+    const summary = {}; let tP=0, tZ=0, tN=0, tB=0, tK=0;
+    filteredPolicies.forEach(p => {
+        const c = p.company || 'DİĞER';
+        if (!summary[c]) summary[c] = { p: 0, z: 0, n: 0, b: 0, k: 0 };
+        if ((p.ek_no || 0) > 0) { summary[c].z++; tZ++; } else { summary[c].p++; tP++; }
+        summary[c].n += p.net_premium;
+        summary[c].b += p.gross_premium;
+        summary[c].k += p.commission;
+        tN += p.net_premium; tB += p.gross_premium; tK += p.commission;
+    });
+    document.getElementById('table-reports').innerHTML = Object.entries(summary).sort((a,b)=>a[0].localeCompare(b[0],'tr')).map(([name, s]) => {
+        const ratio = tN > 0 ? (s.n/tN*100).toFixed(1) : 0;
+        return `<tr><td><strong>${name}</strong></td><td>${s.p}</td><td>${s.z}</td><td><strong>${fmtCy(s.n)}</strong></td><td>${fmtCy(s.b)}</td><td>${fmtCy(s.k)}</td><td>%${ratio}</td></tr>`;
+    }).join('');
+    renderRawPolicies(filteredPolicies);
+}
+
+function renderRawPolicies(filteredData) {
+    const tbody = document.getElementById('table-raw-policies');
+    if(!tbody) return;
+    const dataToRender = filteredData || policies;
+    const sorted = [...dataToRender].sort((a,b) => new Date(b.issue_date||0) - new Date(a.issue_date||0));
+    tbody.innerHTML = sorted.map(p => `<tr>
+        <td><small>${cleanDate(p.issue_date)}</small></td>
+        <td><small>${cleanDate(p.start_date)}</small></td>
+        <td><small>${cleanDate(p.expiry_date)}</small></td>
+        <td><strong>${p.policy_no||'-'}</strong></td>
+        <td>${p.customer_name||'-'}</td>
+        <td>${p.company||'-'}</td>
+        <td><span class="badge badge-neutral" style="font-size:0.65rem;">${p.branch||'-'}</span></td>
+        <td><small style="color:var(--text-muted);">${p.description||'-'}</small></td>
+        <td>${fmtCy(p.net_premium)}</td>
+        <td>${fmtCy(p.gross_premium)}</td>
+        <td><span class="badge ${badgeClass(p.status)}">${p.status}</span></td>
+    </tr>`).join('');
+}
+
 
 async function approveProposal(id) {
     const p = proposals.find(x => x.id == id);
@@ -1575,27 +1642,79 @@ if(fileInput) {
 
 // EXCEL
 function exportToExcel() {
-    if(typeof XLSX === 'undefined') { showToast("Yükleniyor...", "error"); return; }
-    const ws_data = [["Şirket Adı", "Poliçe Adedi", "Zeyil Adedi", "Net Prim", "Komisyon", "Ürt.Oran"]];
-    const summary = {}; let tNet = 0, tKom = 0, tPol = 0, tZeyil = 0;
+    if(typeof XLSX === 'undefined') { showToast("XLSX kütüphanesi yüklenmedi!", "error"); return; }
+    
+    // === SAYFA 1: ÖZET ===
+    const summary = {}; let tNet=0, tBrut=0, tKom=0, tPol=0, tZeyil=0;
     policies.forEach(p => {
         const c = p.company || 'DİĞER';
-        if (!summary[c]) summary[c] = { p: 0, z: 0, n: 0, k: 0 };
-        if ((p.ek_no || 0) > 0) { summary[c].z++; tZeyil++; } else { summary[c].p++; tPol++; }
-        summary[c].n += p.net_premium; summary[c].k += p.commission; tNet += p.net_premium; tKom += p.commission;
+        if (!summary[c]) summary[c] = { p:0, z:0, n:0, b:0, k:0 };
+        if ((p.ek_no||0) > 0) { summary[c].z++; tZeyil++; } else { summary[c].p++; tPol++; }
+        summary[c].n += p.net_premium;
+        summary[c].b += p.gross_premium;
+        summary[c].k += p.commission;
+        tNet += p.net_premium; tBrut += p.gross_premium; tKom += p.commission;
     });
-    Object.entries(summary).sort((a, b) => a[0].localeCompare(b[0])).forEach(([name, s]) => { ws_data.push([name, s.p, s.z, s.n, s.k, tNet > 0 ? parseFloat((s.n/tNet*100).toFixed(2)):0]); });
-    ws_data.push(["Toplam", tPol, tZeyil, tNet, tKom, 100], [], ["Poliçe Listesi"], ["Tarih", "Poliçe No", "Müşteri", "Şirket", "Net", "Komisyon", "Durum"]);
-    
-    [...policies].sort((a,b)=>new Date(a.issue_date)-new Date(b.issue_date)).forEach(p=>{
-        ws_data.push([cleanDate(p.issue_date), p.policy_no, p.customer_name, p.company, parseFloat(p.net_premium||0), parseFloat(p.commission||0), p.status]);
+
+    const ws_ozet = [["Şirket Adı", "Poliçe", "Zeyil", "Net Prim (₺)", "Brüt Prim (₺)", "Komisyon (₺)", "Ürt.Oran (%)"]];
+    Object.entries(summary).sort((a,b)=>a[0].localeCompare(b[0],'tr')).forEach(([name, s]) => {
+        ws_ozet.push([name, s.p, s.z,
+            parseFloat(s.n.toFixed(2)),
+            parseFloat(s.b.toFixed(2)),
+            parseFloat(s.k.toFixed(2)),
+            tNet > 0 ? parseFloat((s.n/tNet*100).toFixed(2)) : 0
+        ]);
     });
-    
-    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    ws_ozet.push(["TOPLAM", tPol, tZeyil,
+        parseFloat(tNet.toFixed(2)),
+        parseFloat(tBrut.toFixed(2)),
+        parseFloat(tKom.toFixed(2)),
+        100
+    ]);
+
+    // === SAYFA 2: HAM VERİ ===
+    const ws_ham = [["Tanzim Tarihi","Başlangıç","Bitiş","Poliçe No","Müşteri","TC/VKN","Şirket","Branş (Tür)","Plaka/Açıklama","Net Prim (₺)","Brüt Prim (₺)","Komisyon (₺)","Durum"]];
+    [...policies].sort((a,b)=>new Date(b.issue_date||0)-new Date(a.issue_date||0)).forEach(p => {
+        ws_ham.push([
+            cleanDate(p.issue_date),
+            cleanDate(p.start_date),
+            cleanDate(p.expiry_date),
+            p.policy_no || '',
+            p.customer_name || '',
+            p.customer_id || '',
+            p.company || '',
+            p.branch || '',
+            p.description || '',
+            parseFloat((p.net_premium||0).toFixed(2)),
+            parseFloat((p.gross_premium||0).toFixed(2)),
+            parseFloat((p.commission||0).toFixed(2)),
+            p.status || ''
+        ]);
+    });
+
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Rapor");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws_ozet), "Özet");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws_ham), "Ham Veri");
     XLSX.writeFile(wb, "Rapor_" + cleanDate(new Date()) + ".xlsx");
-    showToast("Excel İndirildi", "success");
+    showToast("Excel İndirildi (2 sayfa)", "success");
+}
+
+function exportFinanceToExcel() {
+    if(typeof XLSX === 'undefined') { showToast("XLSX kütüphanesi yüklenmedi!", "error"); return; }
+    const ws_data = [["Tarih", "Tür", "Kategori", "Açıklama", "Tutar (₺)"]];
+    finance.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(f => {
+        ws_data.push([
+            cleanDate(f.date),
+            f.type,
+            f.category,
+            f.description || '',
+            parseFloat((f.amount || 0).toFixed(2))
+        ]);
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ws_data), "Bilanço");
+    XLSX.writeFile(wb, "Bilanco_" + cleanDate(new Date()) + ".xlsx");
+    showToast("Bilanço Excel İndirildi", "success");
 }
 
 attachUiEvents();
