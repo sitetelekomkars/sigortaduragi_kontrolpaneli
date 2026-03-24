@@ -299,8 +299,11 @@
             <div id="finance" class="page-section">
                 <div class="glass-panel">
                     <div class="panel-header">
-                        <h2>Dükkan Gelir / Gider (Bilanço)</h2>
-                        <button class="btn btn-primary" onclick="openDrawer('finance-drawer')"><i data-lucide="plus"></i> Yeni İşlem</button>
+                        <h2>Gelir / Gider (Bilanço)</h2>
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn btn-outline" onclick="exportFinanceToExcel()"><i data-lucide="download"></i> Excel'e Aktar</button>
+                            <button class="btn btn-primary" onclick="showDrawer('finance-drawer')"><i data-lucide="plus"></i> Yeni Kayıt</button>
+                        </div>
                     </div>
                     <table>
                         <thead>
@@ -321,20 +324,64 @@
              <!-- REPORTS & COMMISSIONS-->
              <div id="reports" class="page-section">
                 <div class="glass-panel">
-                    <div class="panel-header"><h2>Şirket Bazlı Analiz (Genel Toplam)</h2></div>
+                    <div class="panel-header">
+                        <h2>Şirket Bazlı Özet</h2>
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <select id="filter-report-year" onchange="renderReports()" style="width:100px;"></select>
+                            <select id="filter-report-month" onchange="renderReports()" style="width:120px;">
+                                <option value="all">Tüm Aylar</option>
+                                <option value="0">Ocak</option>
+                                <option value="1">Şubat</option>
+                                <option value="2">Mart</option>
+                                <option value="3">Nisan</option>
+                                <option value="4">Mayıs</option>
+                                <option value="5">Haziran</option>
+                                <option value="6">Temmuz</option>
+                                <option value="7">Ağustos</option>
+                                <option value="8">Eylül</option>
+                                <option value="9">Ekim</option>
+                                <option value="10">Kasım</option>
+                                <option value="11">Aralık</option>
+                            </select>
+                        </div>
+                    </div>
                     <table>
                         <thead>
                             <tr>
                                 <th>Şirket</th>
-                                <th>Poliçe Adedi</th>
-                                <th>Zeyil Adedi</th>
+                                <th>Poliçe</th>
+                                <th>Zeyil</th>
                                 <th>Net Prim</th>
-                                <th>Komisyon / Kazanç</th>
+                                <th>Brüt Prim</th>
+                                <th>Komisyon</th>
                                 <th>Ürt. Oran</th>
                             </tr>
                         </thead>
                         <tbody id="table-reports"></tbody>
                     </table>
+                </div>
+                <div class="glass-panel" style="margin-top:1.5rem;">
+                    <div class="panel-header"><h2>Ham Veri — Tüm Poliçeler</h2></div>
+                    <div style="overflow-x:auto;">
+                        <table style="font-size:0.8rem; min-width:900px;">
+                            <thead>
+                                <tr>
+                                    <th>Tanzim</th>
+                                    <th>Başlangıç</th>
+                                    <th>Bitiş</th>
+                                    <th>Poliçe No</th>
+                                    <th>Müşteri</th>
+                                    <th>Şirket</th>
+                                    <th>Branş (Tür)</th>
+                                    <th>Plaka/Açıklama</th>
+                                    <th>Net Prim</th>
+                                    <th>Brüt Prim</th>
+                                    <th>Durum</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-raw-policies"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
             <div id="commissions" class="page-section">
