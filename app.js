@@ -348,6 +348,7 @@ document.getElementById('form-password-change').addEventListener('submit', async
     const newP = document.getElementById('new_pass').value;
     const confirmP = document.getElementById('confirm_pass').value;
     const tempUserStr = sessionStorage.getItem('temp_user');
+    const tempToken = sessionStorage.getItem('temp_token') || '';
     
     if(!tempUserStr) { showToast("Oturum zaman aşımına uğradı, lütfen tekrar giriş yapın.", "error"); location.reload(); return; }
     const tempUser = JSON.parse(tempUserStr);
@@ -364,10 +365,11 @@ document.getElementById('form-password-change').addEventListener('submit', async
         const response = await fetch(gasUrl, {
             method:'POST',
             headers: { 'Content-Type': 'text/plain' },
-            redirect: 'follow', // Mandatory for GAS redirects
+            redirect: 'follow',
             body:JSON.stringify({
                 action:"saveUser", 
                 apiKey: sdApiKey,
+                sessionToken: tempToken,
                 data: { 
                     username: tempUser.username, 
                     password_hash: hashedP,
@@ -375,15 +377,26 @@ document.getElementById('form-password-change').addEventListener('submit', async
                 }
             })
         });
+
+        const result = await response.json();
+        if (result.status !== 'success') {
+            showToast("Şifre güncellenemedi: " + (result.message || "Sunucu hatası"), "error");
+            return;
+        }
         
-        // Even with no-cors, we proceed as we sent the data
-        sessionStorage.setItem('user', JSON.stringify(tempUser));
+        // Success — move to the main app
+        localStorage.setItem('user', JSON.stringify(tempUser));
+        if (tempToken) {
+            localStorage.setItem('sessionToken', tempToken);
+            sessionToken = tempToken;
+        }
         sessionStorage.removeItem('temp_user');
+        sessionStorage.removeItem('temp_token');
         currentUser = tempUser;
         await logAction('SIFRE_DEGISIM', 'Kullanıcı şifresini güncelledi');
         showToast("Şifreniz başarıyla güncellendi.", "success");
         attachUiEvents();
-init(); // This will now hide the screen correctly
+        init();
     } catch(err) { 
         showToast("Bağlantı hatası! Şifre güncellenemedi.", "error"); 
     } finally {
@@ -593,7 +606,7 @@ async function resetUserPassword() {
         console.log("Reset Result:", res);
         showToast("Şifre başarıyla sıfırlandı. Kullanıcı ilk girişte değiştirmeli.", "success");
         closeAllDrawers();
-        setTimeout(loadData, 1000); // Wait a bit before refresh for GAS to process
+        loadData();
     } catch(e) { showToast("İşlem başarısız!", "error"); }
 }
 
@@ -628,7 +641,7 @@ if(formUser) {
                 renderUsersTable();
                 closeAllDrawers();
                 showToast("Kullanıcı güncellendi.", "success");
-                setTimeout(loadData, 500);
+                loadData();
             } else {
                 showToast("Hata: " + res.message, "error");
             }
@@ -1418,7 +1431,7 @@ if (formPolicy) {
                 logAction(updateId ? 'POLIÇE DÜZENLE' : 'YENI POLIÇE', data.policy_no + " - " + data.customer_name);
                 delete formPolicy.dataset.updateId;
                 formPolicy.reset();
-                setTimeout(loadData, 500);
+                loadData();
             } else {
                 showToast("Hata: " + res.message, "error");
             }
@@ -1474,7 +1487,7 @@ if (formProposal) {
                 showToast("Teklif başarıyla kaydedildi.", "success");
                 logAction('TEKLIF KAYDI', data.customer + " - " + data.amount + " TL");
                 formProposal.reset();
-                setTimeout(loadData, 500);
+                loadData();
             } else {
                 showToast("Hata: " + result.message, "error");
             }
