@@ -98,6 +98,12 @@ function updateNotifications() {
     if (badge) {
         badge.textContent = list.length;
         badge.style.display = list.length > 0 ? 'flex' : 'none';
+        
+        // Show toast if count increased or first time
+        if (list.length > 0 && !window._lastNotifShow) {
+            showToast(`${list.length} adet poliçenin vadesi yaklaşıyor!`, 'info');
+            window._lastNotifShow = true;
+        }
     }
     
     if (summary) {
@@ -858,7 +864,7 @@ function computeStatuses() {
         const exp = new Date(p.expiry_date); exp.setHours(0,0,0,0);
         const days = Math.round((exp - today)/(1000*3600*24));
         if(days < 0) p.status = 'Geçmiş';
-        else if(days <= 30) p.status = 'Yaklaşan';
+        else if(days <= 45) p.status = 'Yaklaşan';
         else p.status = 'Aktif';
         p.days_left = days;
     });
