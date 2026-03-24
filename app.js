@@ -93,35 +93,40 @@ function updateNotifications() {
     const list = policies.filter(p => p.status === 'Yaklaşan');
     const badge = document.getElementById('notif-count');
     const panelList = document.getElementById('notif-list');
-    const summary = document.getElementById('notif-summary');
+    const summaryText = document.getElementById('notif-summary');
     
     if (badge) {
         badge.textContent = list.length;
         badge.style.display = list.length > 0 ? 'flex' : 'none';
         
-        // Show toast if count increased or first time
+        // Show toast one time per load
         if (list.length > 0 && !window._lastNotifShow) {
             showToast(`${list.length} adet poliçenin vadesi yaklaşıyor!`, 'info');
             window._lastNotifShow = true;
         }
     }
     
-    if (summary) {
-        summary.textContent = list.length > 0 ? `${list.length} poliçenin vadesi yaklaşıyor` : 'Vadesi yaklaşan poliçe yok';
+    if (summaryText) {
+        summaryText.textContent = list.length > 0 ? `${list.length} adet vadesi yaklaşan poliçe mevcut` : 'Vadesi yaklaşan poliçe yok';
     }
     
     if (panelList) {
         if (list.length === 0) {
-            panelList.innerHTML = '<div class="notif-empty">Vadesi yaklaşan poliçe yok.</div>';
+            panelList.innerHTML = `
+                <div class="notif-empty">
+                    <i data-lucide="bell-off"></i>
+                    <p>Henüz yaklaşan bir poliçe bulunmuyor.</p>
+                </div>`;
         } else {
             panelList.innerHTML = list.sort((a,b)=>a.days_left - b.days_left).map(p => `
                 <div class="notif-item" onclick="showPage('renewals'); toggleNotifPanel();">
                     <span class="notif-title">${escapeHtml(p.customer_name)}</span>
-                    <span class="notif-desc">${escapeHtml(p.policy_no)} - ${escapeHtml(p.branch)}</span>
-                    <span class="notif-time">${p.days_left} Gün Kaldı</span>
+                    <span class="notif-desc">${escapeHtml(p.policy_no)} • ${escapeHtml(p.company)} / ${escapeHtml(p.branch)}</span>
+                    <span class="notif-time"><i data-lucide="clock" style="width:12px;"></i> ${p.days_left} Gün Kaldı</span>
                 </div>
             `).join('');
         }
+        lucide.createIcons();
     }
 }
 
@@ -814,9 +819,10 @@ async function loadData() {
             updateFormDropdowns();
         }
 
+        computeStatuses();
         updateNotifications();
 
-        computeStatuses(); renderKpis(); renderCharts(); renderPolicies(); renderCustomers();
+        renderKpis(); renderCharts(); renderPolicies(); renderCustomers();
         populateReportFilters();
         renderReports();
         renderFinanceTable();
