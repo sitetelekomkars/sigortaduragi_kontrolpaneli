@@ -399,6 +399,9 @@ if (loginForm) {
                 twofaForm.dataset.username = res.username;
                 twofaForm.dataset.rawP = rawP; // Keep for force change check
                 showToast("2FA Kodu Gerekli", "info");
+            } else if(res.status === "2fa_setup_required") {
+                show2FASetupScreen(res.username, rawP);
+                showToast("2FA Kurulumu Gerekli", "warning");
             } else if(res.status === "success") {
                 handleLoginSuccess(res.user, rawP === "123456", res.sessionToken);
             } else {
@@ -451,10 +454,53 @@ if (twofaForm) {
             }
         } catch(e) {
             showToast("Bağlantı hatası!", "error");
+        }
+    });
+}
+
+const finalizeBtn = document.getElementById('btn-finalize-2fa');
+if(finalizeBtn) {
+    finalizeBtn.addEventListener('click', async () => {
+        const screen = document.getElementById('2fa-setup-screen');
+        const code = document.getElementById('setup-2fa-verify-code').value;
+        const username = screen.dataset.username;
+        const secret = screen.dataset.secret;
+        const isDefaultPass = screen.dataset.rawP === "123456";
+
+        if(code.length !== 6) { showToast("Lütfen 6 haneli kodu girin.", "warning"); return; }
+        
+        finalizeBtn.disabled = true;
+        finalizeBtn.innerHTML = '<i class="spin-icon" data-lucide="loader-2"></i> Doğrulanıyor...';
+        lucide.createIcons();
+
+        try {
+            const res = await fetch(gasUrl, {
+                method: 'POST',
+                body: JSON.stringify({ action: "verify2FA", username: username, code: code, apiKey: sdApiKey })
+            }).then(r => r.json());
+
+            if(res.status === "success") {
+                // Success -> also update 'two_fa_required' to false since they just did it
+                await fetch(gasUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({ 
+                        action: 'saveUser', 
+                        apiKey: sdApiKey, 
+                        sessionToken: res.sessionToken, 
+                        data: { username: username, two_fa_required: false } 
+                    })
+                });
+
+                screen.style.display = 'none';
+                handleLoginSuccess(res.user, isDefaultPass, res.sessionToken);
+            } else {
+                showToast(res.message || "Geçersiz kod!", "error");
+            }
+        } catch(e) {
+            showToast("Bağlantı hatası!", "error");
         } finally {
-            btn.disabled = false;
-            btn.innerHTML = 'Doğrula ve Giriş Yap';
-            lucide.createIcons();
+            finalizeBtn.disabled = false;
+            finalizeBtn.textContent = 'Kurulumu Tamamla ve Giriş Yap';
         }
     });
 }
@@ -609,6 +655,33 @@ function showPage(id) {
     logAction('SAYFA_GECIS', id);
 }
 
+async function show2FASetupScreen(username, rawP) {
+    document.getElementById('login-screen').style.display = 'none';
+    const screen = document.getElementById('2fa-setup-screen');
+    screen.style.display = 'flex';
+    screen.dataset.username = username;
+    screen.dataset.rawP = rawP;
+    
+    const qrContainer = document.getElementById('login-qr-container');
+    qrContainer.innerHTML = '<i class="spin-icon" data-lucide="loader-2"></i>';
+    lucide.createIcons();
+
+    try {
+        const res = await fetch(gasUrl, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'setup2FA', username: username, apiKey: sdApiKey })
+        }).then(r => r.json());
+        
+        if(res.status === 'success') {
+            qrContainer.innerHTML = `<img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(res.qrUrl)}" alt="QR Code" style="width:200px; height:200px;">`;
+            // Store secret for verification
+            screen.dataset.secret = res.secret;
+        }
+    } catch(e) {
+        showToast("QR Kod yüklenemedi", "error");
+    }
+}
+
 async function logAction(act, detail="") {
     const username = currentUser ? (currentUser.name || currentUser.username) : 'Sistem';
     const payload = {
@@ -652,7 +725,9 @@ function openPermissions(username) {
     const checkboxes = document.querySelectorAll('#form-permissions input[name="perm"]');
     
     checkboxes.forEach(cb => {
-        if(user.permissions === 'all' || perms.includes(cb.value)) {
+        if (cb.value === 'two_fa_required') {
+            cb.checked = (user.two_fa_required === true || user.two_fa_required === 'TRUE');
+        } else if(user.permissions === 'all' || perms.includes(cb.value)) {
             cb.checked = true;
         } else {
             cb.checked = false;
@@ -668,7 +743,10 @@ if(formPerms) {
         e.preventDefault();
         const username = document.getElementById('perm-username').value;
         const selected = Array.from(document.querySelectorAll('#form-permissions input[name="perm"]:checked')).map(cb => cb.value);
-        const permString = selected.length === 17 ? 'all' : selected.join(','); // 17 total checkboxes now
+        
+        const twoFaRequired = selected.includes('two_fa_required');
+        const permsOnly = selected.filter(p => p !== 'two_fa_required');
+        const permString = permsOnly.length === 16 ? 'all' : permsOnly.join(','); // 16 without 2fa_req
         
         const btn = formPerms.querySelector('button[type="submit"]');
         btn.disabled = true;
@@ -680,7 +758,11 @@ if(formPerms) {
                     action: 'saveUser', 
                     apiKey: sdApiKey, 
                     sessionToken: sessionToken, 
-                    data: { username: username, permissions: permString } 
+                    data: { 
+                        username: username, 
+                        permissions: permString,
+                        two_fa_required: twoFaRequired
+                    } 
                 })
             }).then(r=>r.json());
             
