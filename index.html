@@ -59,6 +59,32 @@
         </div>
     </div>
 
+    <div id="2fa-setup-screen" style="position:fixed; inset:0; background:var(--bg-main); z-index:11000; display:none; align-items:center; justify-content:center; overflow-y:auto; padding:2rem;">
+        <div class="login-card" style="width:480px;">
+            <div style="background:var(--primary); width:64px; height:64px; border-radius:20px; display:flex; align-items:center; justify-content:center; color:white; margin:0 auto 1.5rem;">
+                <i data-lucide="shield-check" style="width:32px; height:32px;"></i>
+            </div>
+            <h2 style="margin-bottom:0.5rem; font-weight:800;">2FA Kurulumu Gerekli</h2>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:2rem;">Admin tarafından hesabınız için iki faktörlü doğrulama zorunlu kılınmıştır. Lütfen aşağıdaki adımları tamamlayın.</p>
+            
+            <div style="text-align:left; background:#f8fafc; border-radius:20px; padding:1.5rem; margin-bottom:1.5rem; border:1px solid var(--border-color);">
+                <p style="font-weight:700; font-size:0.85rem; margin-bottom:1rem; color:var(--primary);">1. Adım: QR Kodu Okutun</p>
+                <div id="login-qr-container" style="background:white; padding:1rem; border-radius:12px; display:flex; justify-content:center; margin-bottom:1rem; border:1px solid var(--border-color);">
+                   <!-- QR will be here -->
+                </div>
+                <p style="font-size:0.8rem; color:var(--text-muted); line-height:1.5;">Telefonunuzdaki Google Authenticator veya benzeri bir uygulama ile bu QR kodu tarayın.</p>
+            </div>
+
+            <div style="text-align:left; background:#f8fafc; border-radius:20px; padding:1.5rem; margin-bottom:2rem; border:1px solid var(--border-color);">
+                <p style="font-weight:700; font-size:0.85rem; margin-bottom:1rem; color:var(--primary);">2. Adım: Kodu Doğrulayın</p>
+                <input type="text" id="setup-2fa-verify-code" placeholder="000000" maxlength="6" style="text-align:center; letter-spacing:8px; font-size:1.4rem; font-weight:800; padding:1rem; border-radius:12px; border:2px solid var(--border-color); width:100%; margin-bottom:1rem;">
+                <button type="button" class="btn btn-primary" id="btn-finalize-2fa" style="width:100%; justify-content:center; padding:1rem;">Kurulumu Tamamla ve Giriş Yap</button>
+            </div>
+            
+            <button type="button" class="btn btn-outline" onclick="location.reload()" style="width:100%; justify-content:center; padding:1rem; border-color:transparent; color:var(--text-muted);">Giriş Ekranına Dön</button>
+        </div>
+    </div>
+
     <!-- Sidebar -->
     <aside class="sidebar">
         <div class="logo-container">
@@ -677,6 +703,7 @@
                 <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" name="perm" value="action_edit_policy" checked> Poliçe Düzenleme</label>
                 <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" name="perm" value="action_delete_policy" checked> Poliçe Silme</label>
                 <label style="display:flex; align-items:center; gap:8px; cursor:pointer;"><input type="checkbox" name="perm" value="action_export_excel" checked> Rapor İndirme (Excel)</label>
+                <label style="display:flex; align-items:center; gap:8px; cursor:pointer; color:var(--danger); font-weight:700;"><input type="checkbox" name="perm" value="two_fa_required"> 2FA Zorunlu Kıl</label>
             </div>
             <div style="background:rgba(245, 158, 11, 0.05); border-radius:12px; padding:1rem; border:1px solid rgba(245, 158, 11, 0.2);">
                 <small style="color:var(--warning); font-weight:700;"><i data-lucide="info" style="width:14px; vertical-align:middle;"></i> Not:</small>
